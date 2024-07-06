@@ -1,0 +1,11 @@
+{
+	"geode": "3.2.0",
+	"gd": {
+		"win": "2.206"
+	},
+	"id": "vinsterplays.music_integrations",
+	"name": "Music Integrations",
+	"version": "v1.0.0",
+	"developer": "Vinsterplays",
+	"description": "Automatically plays music from external apps (Spotify, YT, etc.)"
+}
