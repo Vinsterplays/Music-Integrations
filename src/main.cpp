@@ -11,6 +11,8 @@ using namespace winrt;
 using namespace Windows::Foundation;
 using namespace Windows::Media::Control;
 
+bool togglePlayback = false;
+
 bool isMediaPlaying() {
   try {
     auto mediaManager = GlobalSystemMediaTransportControlsSessionManager::RequestAsync().get();
@@ -20,9 +22,11 @@ bool isMediaPlaying() {
       auto playbackInfo = currentSession.GetPlaybackInfo();
       auto playbackStatus = playbackInfo.PlaybackStatus();
 
-      log::debug("SMTC playback status: {}", static_cast < int > (playbackStatus));
+      log::debug("SMTC playback status: {}", static_cast<int>(playbackStatus));
 
-      return playbackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing;
+      if (playbackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing) {
+        return true;
+      }
     }
   } catch (const hresult_error & e) {
     log::debug("Failed to get media session or playback info: {}", to_string(e.message().c_str()));
@@ -68,30 +72,56 @@ void resumeMediaPlayback() {
 class $modify(LevelEditorLayer) {
   void onPlaytest() {
     LevelEditorLayer::onPlaytest();
-    pauseMediaPlayback();
+    if (isMediaPlaying() == true) {
+      pauseMediaPlayback();
+      togglePlayback = true;
+    } else {
+      togglePlayback = false;
+    }
   }
   void onResumePlaytest() {
     LevelEditorLayer::onResumePlaytest();
-    pauseMediaPlayback();
+    if (isMediaPlaying() == true) {
+      pauseMediaPlayback();
+      togglePlayback = true;
+    } else {
+      togglePlayback = false;
+    }
   }
   void onStopPlaytest() {
     LevelEditorLayer::onStopPlaytest();
-    resumeMediaPlayback();
+    if (togglePlayback == true) {
+      resumeMediaPlayback();
+    }
   }
   bool init(GJGameLevel * p0, bool p1) {
     if (!LevelEditorLayer::init(p0, p1)) return false;
-    resumeMediaPlayback();
+    if (togglePlayback == true) {
+      resumeMediaPlayback();
+    }
+    if (isMediaPlaying() == true) {
+      togglePlayback = true;
+    } else {
+      togglePlayback = false;
+    }
     return true;
   }
 };
 class $modify(PlayLayer) {
   bool init(GJGameLevel * level, bool useReplay, bool dontCreateObjects) {
     if (!PlayLayer::init(level, useReplay, dontCreateObjects)) return false;
-    pauseMediaPlayback();
+    if (isMediaPlaying() == true) {
+      pauseMediaPlayback();
+      togglePlayback = true;
+    } else {
+      togglePlayback = false;
+    }
     return true;
   }
   void onQuit() {
     PlayLayer::onQuit();
-    resumeMediaPlayback();
+    if (togglePlayback == true) {
+      resumeMediaPlayback();
+    }
   }
 };

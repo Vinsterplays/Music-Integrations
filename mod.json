@@ -7,5 +7,7 @@
 	"name": "Music Integrations",
 	"version": "v1.0.0",
 	"developer": "Vinsterplays",
-	"description": "Automatically plays music from external apps (Spotify, YT, etc.)"
+	"description": "Automatically plays music from external apps (Spotify, YT, etc.)",
+	"repository": "https://github.com/Vinsterplays/Music-Integrations",
+	"tags": ["music", "enhancement", "editor"]
 }
