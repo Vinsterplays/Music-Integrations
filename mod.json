@@ -5,7 +5,7 @@
 	},
 	"id": "vinsterplays.music_integrations",
 	"name": "Music Integrations",
-	"version": "v1.0.0",
+	"version": "v1.1.0",
 	"developer": "Vinsterplays",
 	"description": "Automatically plays music from external apps (Spotify, YT, etc.)",
 	"repository": "https://github.com/Vinsterplays/Music-Integrations",
