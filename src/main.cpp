@@ -3,6 +3,8 @@
 #include <winrt/Windows.Media.Control.h>
 #include <Geode/modify/LevelEditorLayer.hpp>
 #include <Geode/modify/PlayLayer.hpp>
+#include <Geode/modify/CustomSongWidget.hpp>
+#include <Geode/modify/FMODAudioEngine.hpp>
 
 #define WINRT_CPPWINRT
 
@@ -12,6 +14,8 @@ using namespace Windows::Foundation;
 using namespace Windows::Media::Control;
 
 bool togglePlayback = false;
+bool listeningViaWidget = false;
+int statesChanged = 0;
 
 bool isMediaPlaying() {
   try {
@@ -22,7 +26,7 @@ bool isMediaPlaying() {
       auto playbackInfo = currentSession.GetPlaybackInfo();
       auto playbackStatus = playbackInfo.PlaybackStatus();
 
-      log::debug("SMTC playback status: {}", static_cast<int>(playbackStatus));
+      log::debug("SMTC playback status: {}", static_cast < int > (playbackStatus));
 
       if (playbackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing) {
         return true;
@@ -72,6 +76,9 @@ void resumeMediaPlayback() {
 class $modify(LevelEditorLayer) {
   void onPlaytest() {
     LevelEditorLayer::onPlaytest();
+    if (Mod::get() -> getSettingValue < bool > ("toggleWhenPlaytesting") == false) {
+      return;
+    }
     if (isMediaPlaying() == true) {
       pauseMediaPlayback();
       togglePlayback = true;
@@ -81,6 +88,9 @@ class $modify(LevelEditorLayer) {
   }
   void onResumePlaytest() {
     LevelEditorLayer::onResumePlaytest();
+    if (Mod::get() -> getSettingValue < bool > ("toggleWhenPlaytesting") == false) {
+      return;
+    }
     if (isMediaPlaying() == true) {
       pauseMediaPlayback();
       togglePlayback = true;
@@ -90,19 +100,25 @@ class $modify(LevelEditorLayer) {
   }
   void onStopPlaytest() {
     LevelEditorLayer::onStopPlaytest();
+    if (Mod::get() -> getSettingValue < bool > ("toggleWhenPlaytesting") == false) {
+      return;
+    }
     if (togglePlayback == true) {
       resumeMediaPlayback();
     }
   }
   bool init(GJGameLevel * p0, bool p1) {
     if (!LevelEditorLayer::init(p0, p1)) return false;
-    if (togglePlayback == true) {
-      resumeMediaPlayback();
-    }
     if (isMediaPlaying() == true) {
       togglePlayback = true;
     } else {
       togglePlayback = false;
+    }
+    if (Mod::get() -> getSettingValue < bool > ("resumeAtEditorEnter") == false) {
+      return true;
+    }
+    if (togglePlayback == true) {
+      resumeMediaPlayback();
     }
     return true;
   }
@@ -110,6 +126,9 @@ class $modify(LevelEditorLayer) {
 class $modify(PlayLayer) {
   bool init(GJGameLevel * level, bool useReplay, bool dontCreateObjects) {
     if (!PlayLayer::init(level, useReplay, dontCreateObjects)) return false;
+    if (Mod::get() -> getSettingValue < bool > ("muteAtStartLevel") == false) {
+      return true;
+    }
     if (isMediaPlaying() == true) {
       pauseMediaPlayback();
       togglePlayback = true;
@@ -120,8 +139,26 @@ class $modify(PlayLayer) {
   }
   void onQuit() {
     PlayLayer::onQuit();
+    if (Mod::get() -> getSettingValue < bool > ("resumeAtEndLevel") == false) {
+      return;
+    }
     if (togglePlayback == true) {
       resumeMediaPlayback();
+    }
+  }
+};
+
+class $modify(CustomSongWidget) {
+  void onPlayback(cocos2d::CCObject * sender) {
+    CustomSongWidget::onPlayback(sender);
+    if (Mod::get() -> getSettingValue < bool > ("muteAtWidgetPlay") == false) {
+      return;
+    }
+    if (isMediaPlaying() == true) {
+      togglePlayback = true;
+      pauseMediaPlayback();
+    } else {
+      togglePlayback = false;
     }
   }
 };

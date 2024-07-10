@@ -4,10 +4,42 @@
 		"win": "2.206"
 	},
 	"id": "vinsterplays.music_integrations",
-	"name": "Music Integrations",
-	"version": "v1.1.0",
+	"name": "Spotify Connect",
+	"version": "v1.1.1",
 	"developer": "Vinsterplays",
-	"description": "Automatically plays music from external apps (Spotify, YT, etc.)",
+	"description": "Plays/Pauses Spotify/YT automatically.",
 	"repository": "https://github.com/Vinsterplays/Music-Integrations",
-	"tags": ["music", "enhancement", "editor"]
+	"tags": ["music", "enhancement", "editor"],
+	"settings": {
+		"muteAtStartLevel": {
+			"name": "Mute when Starting Level",
+			"description": "Mute playback at the start of a level",
+			"type": "bool",
+			"default": true
+		},
+		"resumeAtEndLevel": {
+			"name": "Resume When Leaving Level",
+			"description": "Mute playback when leaving a level",
+			"type": "bool",
+			"default": true
+		},
+		"resumeAtEditorEnter": {
+			"name": "Resume When Entering Editor",
+			"description": "Resume playback when entering the editor",
+			"type": "bool",
+			"default": true
+		},
+		"toggleWhenPlaytesting": {
+			"name": "Toggle When PlayTesting",
+			"description": "Toggle playback when entering or leaving playtest",
+			"type": "bool",
+			"default": true
+		},
+		"muteAtWidgetPlay": {
+			"name": "Mute When Listening to Song",
+			"description": "Mute playback when listening to a song in the music library",
+			"type": "bool",
+			"default": false
+		}
+	}
 }
