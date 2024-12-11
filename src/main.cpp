@@ -10,6 +10,9 @@
 
 #include <Geode/modify/PlayLayer.hpp>
 
+#include <Geode/modify/MenuLayer.hpp>
+
+
 #define WINRT_CPPWINRT
 
 using namespace geode::prelude;
@@ -21,10 +24,10 @@ bool togglePlayback = false;
 bool m_lastMusicState = false;
 bool m_isPlaytesting = false;
 bool m_hitPercentage = false;
+GlobalSystemMediaTransportControlsSessionManager mediaManager = nullptr;
 
 bool isMediaPlaying() {
   try {
-    auto mediaManager = GlobalSystemMediaTransportControlsSessionManager::RequestAsync().get();
     auto currentSession = mediaManager.GetCurrentSession();
 
     if (currentSession) {
@@ -46,7 +49,6 @@ bool isMediaPlaying() {
 
 void pauseMediaPlayback() {
   try {
-    auto mediaManager = GlobalSystemMediaTransportControlsSessionManager::RequestAsync().get();
     auto currentSession = mediaManager.GetCurrentSession();
 
     if (currentSession) {
@@ -64,8 +66,8 @@ void pauseMediaPlayback() {
 
 void resumeMediaPlayback() {
   try {
-    auto mediaManager = GlobalSystemMediaTransportControlsSessionManager::RequestAsync().get();
     auto currentSession = mediaManager.GetCurrentSession();
+    
     if (currentSession) {
       auto result = currentSession.TryPlayAsync().get();
       if (result) {
@@ -77,6 +79,41 @@ void resumeMediaPlayback() {
   } catch (const hresult_error & e) {
     log::debug("Failed to get media session or resume playback: {}", to_string(e.message().c_str()));
   }
+}
+
+$on_mod(Loaded) {
+    log::debug("Requesting media manager...");
+
+    auto async = GlobalSystemMediaTransportControlsSessionManager::RequestAsync();
+    auto start = std::chrono::steady_clock::now();
+
+    while (true) {
+        auto status = async.Status();
+        
+        if (status == AsyncStatus::Completed) {
+            try {
+                mediaManager = async.GetResults();
+                log::debug("fetching session");
+            } catch (const winrt::hresult_error& e) {
+                log::debug("Failed to get media session: {}", winrt::to_string(e.message()));
+            } catch (...) {
+                log::debug("Unknown exception while retrieving media session.");
+            }
+            break;
+        } else if (status == AsyncStatus::Error || status == AsyncStatus::Canceled) {
+            log::debug("Failed to retrieve media manager.");
+            break;
+        }
+
+        auto now = std::chrono::steady_clock::now();
+        std::chrono::duration<double> elapsed = now - start;
+        if (elapsed.count() > 3.0) {
+            log::debug("No result from media manager request after 3 seconds. Aborting.");
+            async.Cancel();
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
 }
 
 class $modify(PlayLayer) {

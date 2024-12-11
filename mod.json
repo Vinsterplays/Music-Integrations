@@ -5,7 +5,7 @@
 	},
 	"id": "vinsterplays.music_integrations",
 	"name": "Music Integrations",
-	"version": "v1.2.0",
+	"version": "v1.2.1",
 	"developer": "Vinsterplays",
 	"description": "Control YT/Spotify in the editor.",
 	"repository": "https://github.com/Vinsterplays/Music-Integrations",
