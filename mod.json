@@ -1,45 +1,41 @@
 {
-	"geode": "3.2.0",
+	"geode": "4.0.1",
 	"gd": {
-		"win": "2.206"
+		"win": "2.2074"
 	},
 	"id": "vinsterplays.music_integrations",
-	"name": "Spotify Connect",
-	"version": "v1.1.1",
+	"name": "Music Integrations",
+	"version": "v1.2.0",
 	"developer": "Vinsterplays",
-	"description": "Plays/Pauses Spotify/YT automatically.",
+	"description": "Control YT/Spotify in the editor.",
 	"repository": "https://github.com/Vinsterplays/Music-Integrations",
 	"tags": ["music", "enhancement", "editor"],
 	"settings": {
 		"muteAtStartLevel": {
 			"name": "Mute when Starting Level",
-			"description": "Mute playback at the start of a level",
+			"description": "Mute playback at the start of a level.",
 			"type": "bool",
 			"default": true
 		},
 		"resumeAtEndLevel": {
 			"name": "Resume When Leaving Level",
-			"description": "Mute playback when leaving a level",
+			"description": "Resume playback when leaving a level.",
 			"type": "bool",
 			"default": true
 		},
-		"resumeAtEditorEnter": {
-			"name": "Resume When Entering Editor",
-			"description": "Resume playback when entering the editor",
-			"type": "bool",
-			"default": true
-		},
-		"toggleWhenPlaytesting": {
-			"name": "Toggle When PlayTesting",
-			"description": "Toggle playback when entering or leaving playtest",
-			"type": "bool",
-			"default": true
-		},
-		"muteAtWidgetPlay": {
-			"name": "Mute When Listening to Song",
-			"description": "Mute playback when listening to a song in the music library",
-			"type": "bool",
-			"default": false
+		"playbackPercentage": {
+			"name": "Mute When at Percentage",
+			"description": "Pause playback when at a certain percentage in a level (Classic Only). Set to -1 to disable.",
+			"type": "int",
+			"default": -1,
+			"min": -1,
+			"max": 100,
+			"controls": {
+				"slider": true,
+				"slider-step": 1,
+				"input": true
+			}
 		}
+		
 	}
 }

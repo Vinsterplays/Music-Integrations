@@ -7,5 +7,7 @@ Have you ever wanted to listen to your own music in the editor while not having 
 - Stops music when playtesting in the editor
 - Stops music when loading a level
 - Starts music when leaving a level
+- Stops music when listening to songs in the music library
+- Stops music at a specified percentage
 
 Windows only, Sorry!
