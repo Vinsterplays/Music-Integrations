@@ -1,3 +1,6 @@
+# 1.2.2
+- Fixed a crash caused by running the mod on wine/proton
+
 # 1.2.1
 - Fixed a crash caused if the windows media controls were broken
 - Improved performance
