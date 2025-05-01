@@ -22,7 +22,7 @@ public:
     void resumePlayback();
     void pausePlayback();
     bool isPlaybackActive();
-    bool m_queuePopup = false;
+    bool m_wine = false;
 
     bool m_immune = false;
     bool m_active = false;

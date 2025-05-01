@@ -18,6 +18,7 @@ void PlaybackManager::getMediaManager() {
 
     if (isWine()) {
         log::debug("Running on Wine, skipping media manager initialization.");
+        m_wine = true;
         return;
     }
 
@@ -58,6 +59,7 @@ void PlaybackManager::removeMediaManager() {
 }
 
 bool PlaybackManager::isPlaybackActive() {
+    if (m_wine) return false;
     try {
         auto currentSession = m_mediaManager.GetCurrentSession();
 
@@ -76,6 +78,7 @@ bool PlaybackManager::isPlaybackActive() {
 }
 
 void PlaybackManager::resumePlayback() {
+    if (m_wine) return;
     try {
         auto currentSession = m_mediaManager.GetCurrentSession();
         if (currentSession && !m_immune) {
@@ -91,6 +94,7 @@ void PlaybackManager::resumePlayback() {
 }
 
 void PlaybackManager::pausePlayback() {
+    if (m_wine) return;
     try {
         auto currentSession = m_mediaManager.GetCurrentSession();
 
