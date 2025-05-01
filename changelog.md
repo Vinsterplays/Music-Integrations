@@ -1,3 +1,8 @@
+# 1.4.0
+- Updated to Geode 4.3.1
+- Rewrote the entire mod lmao
+- Settings temporarily gone for now, will be added back later
+
 # 1.3.0
 - Added option to play/pause media when pausing a level
 - Fixed an issue where the game would continue to run in the background after closing

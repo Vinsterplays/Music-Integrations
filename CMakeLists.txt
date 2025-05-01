@@ -4,15 +4,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64")
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
-project(MusicIntegrations VERSION 1.0.1)
+project(MusicIntegrations VERSION 1.0.0)
+
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
 
 include_directories("${CMAKE_SOURCE_DIR}/include/winrt")
 
 # Set up the mod binary
-add_library(${PROJECT_NAME} SHARED
-    src/main.cpp
-    # Add any extra C++ source files here
-)
+add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
 if (NOT DEFINED ENV{GEODE_SDK})
     message(FATAL_ERROR "Unable to find Geode SDK! Please define GEODE_SDK environment variable to point to Geode")

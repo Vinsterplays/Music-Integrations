@@ -1,41 +1,13 @@
 {
-	"geode": "4.2.0",
+	"geode": "4.3.1",
 	"gd": {
 		"win": "2.2074"
 	},
 	"id": "vinsterplays.music_integrations",
 	"name": "Music Integrations",
-	"version": "v1.3.0",
+	"version": "v1.4.0",
 	"developer": "Vinsterplays",
 	"description": "Control YT/Spotify in the editor.",
 	"repository": "https://github.com/Vinsterplays/Music-Integrations",
-	"tags": ["music", "enhancement", "editor"],
-	"settings": {
-		"toggleJoinLeaveLevel": {
-			"name": "Mute when Starting Level",
-			"description": "Mute playback at the start of a level.",
-			"type": "bool",
-			"default": true
-		},
-		"togglePause": {
-			"name": "Resume When Pausing Level",
-			"description": "Resume playback when pausing a level.",
-			"type": "bool",
-			"default": true
-		},
-		"playbackPercentage": {
-			"name": "Mute When at Percentage",
-			"description": "Pause playback when at a certain percentage in a level (Classic Only). Set to -1 to disable.",
-			"type": "int",
-			"default": -1,
-			"min": -1,
-			"max": 100,
-			"controls": {
-				"slider": true,
-				"slider-step": 1,
-				"input": true
-			}
-		}
-		
-	}
+	"tags": ["music", "enhancement", "editor"]
 }
