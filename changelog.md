@@ -1,3 +1,10 @@
+# 1.5.0
+- Rerewrote the entire mod again lmao
+- Updated to Geode 4.7.0
+- Settings are now back
+- Now able to toggle automatic playback without having to disable to mod
+- New overlay (viewed by holding 'Alt'), you can manually toggle playback or skip songs from this
+
 # 1.4.0
 - Updated to Geode 4.3.1
 - Rewrote the entire mod lmao
