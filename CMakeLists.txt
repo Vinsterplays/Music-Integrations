@@ -14,6 +14,9 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
 
 include_directories("${CMAKE_SOURCE_DIR}/include/winrt")
 
+# Set up the mod binary
+add_library(${PROJECT_NAME} SHARED ${SOURCES})
+
 # gh actions taken from EclipseMenu
 if(DEFINED ENV{GITHUB_ACTIONS})
   # Enable LTO for smaller binaries
@@ -21,9 +24,6 @@ if(DEFINED ENV{GITHUB_ACTIONS})
   target_compile_definitions(${PROJECT_NAME} PRIVATE GITHUB_ACTIONS)
   message(STATUS "GitHub Actions build detected")
 endif()
-
-# Set up the mod binary
-add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
 #debug macro taken from EclipseMenu
 if (NOT DEFINED ENV{GITHUB_ACTIONS})
