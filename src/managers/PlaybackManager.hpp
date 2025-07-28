@@ -14,14 +14,18 @@ using namespace Windows::Media::Control;
 class PlaybackManager {
 protected:
     PlaybackManager() {}
-    GlobalSystemMediaTransportControlsSessionManager m_mediaManager = nullptr;
 public:
+    GlobalSystemMediaTransportControlsSessionManager m_mediaManager = nullptr;
     bool isWine();
-    void getMediaManager();
+    bool getMediaManager();
     void removeMediaManager();
-    void resumePlayback();
-    void pausePlayback();
+    bool control(bool play);
+    bool skip(bool direction);
+    bool toggleControl();
     bool isPlaybackActive();
+    std::optional<std::string> getCurrentSongTitle();
+    std::optional<std::string> getCurrentSongArtist();
+    
     bool m_wine = false;
 
     bool m_immune = false;

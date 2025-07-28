@@ -1,13 +1,40 @@
 {
-	"geode": "4.3.1",
+	"geode": "4.7.0",
 	"gd": {
 		"win": "2.2074"
 	},
 	"id": "vinsterplays.music_integrations",
 	"name": "Music Integrations",
-	"version": "v1.4.0",
+	"version": "v1.5.0",
 	"developer": "Vinsterplays",
 	"description": "Control YT/Spotify in the editor.",
 	"repository": "https://github.com/Vinsterplays/Music-Integrations",
-	"tags": ["music", "enhancement", "editor"]
+	"tags": ["music", "enhancement", "editor", "universal"],
+	"resources": {"sprites": ["resources/*.png"]},
+	"settings": {
+		"auto-settings": {
+			"name": "Auto Playback Settings",
+			"type": "title"
+		},
+		"auto-muteWhenEnterLevel": {
+			"name": "Mute When Entering Level",
+			"type": "bool",
+			"default": true
+		},
+		"auto-playWhenLeaveLevel": {
+			"name": "Play When Leaving Level",
+			"type": "bool",
+			"default": true
+		},
+		"auto-muteWhenPlaytest": {
+			"name": "Mute When Starting Editor Playtest",
+			"type": "bool",
+			"default": true
+		},
+		"auto-playWhenStopPlaytest": {
+			"name": "Play When Ending Editor Playtest",
+			"type": "bool",
+			"default": true
+		}
+	}
 }
