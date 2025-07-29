@@ -98,7 +98,7 @@ class $modify(CCScene) {
 class $modify(LevelEditorLayer) {
     void onPlaytest() {        
         LevelEditorLayer::onPlaytest();
-        if (!Mod::get()->getSavedValue<bool>("autoEnabled") || !Mod::get()->getSettingValue<bool>("auto-muteWhenPlaytest")) return;
+        if (!Mod::get()->getSavedValue<bool>("autoEnabled")) return;
         auto& pbm = PlaybackManager::get();
         pbm.control(false);
         pbm.m_immune = true;
@@ -106,7 +106,7 @@ class $modify(LevelEditorLayer) {
     void onStopPlaytest() {
         auto playtest = GJBaseGameLayer::get()->m_playbackMode;
         LevelEditorLayer::onStopPlaytest();
-        if (!Mod::get()->getSavedValue<bool>("autoEnabled") || !Mod::get()->getSettingValue<bool>("auto-playWhenStopPlaytest") || static_cast<int>(playtest) == 0) return;
+        if (!Mod::get()->getSavedValue<bool>("autoEnabled") || static_cast<int>(playtest) == 0) return;
         auto& pbm = PlaybackManager::get();
         pbm.m_immune = false;
         if(!FMODAudioEngine::sharedEngine()->isMusicPlaying(0)) pbm.control(true);
@@ -124,7 +124,7 @@ class $modify(LevelEditorLayer) {
 class $modify(PlayLayer) {
     bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
         if (!PlayLayer::init(level, useReplay, dontCreateObjects)) return false;
-        if (!Mod::get()->getSavedValue<bool>("autoEnabled") || !Mod::get()->getSettingValue<bool>("auto-muteWhenEnterLevel")) return true;
+        if (!Mod::get()->getSavedValue<bool>("autoEnabled")) return true;
         auto& pbm = PlaybackManager::get();
         pbm.control(false);
         pbm.m_immune = true;
@@ -132,7 +132,7 @@ class $modify(PlayLayer) {
     }
     void onQuit() {
         PlayLayer::onQuit();
-        if (!Mod::get()->getSavedValue<bool>("autoEnabled") || !Mod::get()->getSettingValue<bool>("auto-playWhenLeaveLevel")) return;
+        if (!Mod::get()->getSavedValue<bool>("autoEnabled")) return;
         auto& pbm = PlaybackManager::get();
         pbm.m_immune = false;
         if(!FMODAudioEngine::sharedEngine()->isMusicPlaying(0)) pbm.control(true);

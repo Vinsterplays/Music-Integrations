@@ -13,7 +13,7 @@ protected:
     CCLabelBMFont* m_unavailableLabel;
     CCLabelBMFont* m_autoLabel;
     CCMenu* m_menu;
-    CCMenuItemSpriteExtra* m_settingsBtn;
+    //CCMenuItemSpriteExtra* m_settingsBtn;
     CCMenuItemSpriteExtra* m_rewindBtn;
     CCMenuItemSpriteExtra* m_playbackBtn;
     CCMenuItemSpriteExtra* m_skipBtn;
@@ -64,11 +64,11 @@ protected:
                 ->setAxisAlignment(AxisAlignment::Center)
             );
 
-            m_settingsBtn = CCMenuItemSpriteExtra::create(
+            /*m_settingsBtn = CCMenuItemSpriteExtra::create(
                 CCSprite::createWithSpriteFrameName("GJ_optionsBtn02_001.png"),
                 this,
                 menu_selector(MusicControlOverlay::onSettings)
-            );
+            );*/
 
             m_rewindBtn = CCMenuItemSpriteExtra::create(
                 CCSprite::create("previous.png"_spr),
@@ -98,14 +98,14 @@ protected:
             m_autoLabel = CCLabelBMFont::create("Auto", "bigFont.fnt");
             m_autoLabel->setScale(0.7f);
 
-            m_menu->addChild(m_settingsBtn);
+            //m_menu->addChild(m_settingsBtn);
             m_menu->addChild(m_rewindBtn);
             m_menu->addChild(m_playbackBtn);
             m_menu->addChild(m_skipBtn);
             m_menu->addChild(m_autoBtn);
             m_menu->setTouchPriority(-999);
             m_menu->updateLayout();
-            this->addChildAtPosition(m_menu, Anchor::Bottom, ccp(-30, this->getContentHeight()/4));
+            this->addChildAtPosition(m_menu, Anchor::Bottom, ccp(0, this->getContentHeight()/4));
             this->addChildAtPosition(m_autoLabel, Anchor::Bottom, ccp(140, this->getContentHeight()/4));
         } else {
             m_unavailableLabel = CCLabelBMFont::create("Media Controls Unavailable", "goldFont.fnt");
@@ -117,9 +117,9 @@ protected:
 		return true;
 	}
 
-    void onSettings(CCObject*) {
+    /*void onSettings(CCObject*) {
         openSettingsPopup(Mod::get(), false);
-    }
+    }*/
 
     void onPlayback(CCObject*) {
         pbm.toggleControl();
