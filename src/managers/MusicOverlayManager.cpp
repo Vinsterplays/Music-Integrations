@@ -1,6 +1,7 @@
 #include "Geode/loader/Event.hpp"
 #include "Geode/loader/Log.hpp"
 #include "PlaybackManager.hpp"
+#include "AdvancedLabelManager.hpp"
 #include <Geode/Geode.hpp>
 #include <Geode/loader/Dispatch.hpp>
 #include <Geode/ui/GeodeUI.hpp>
@@ -8,8 +9,8 @@
 class MusicControlOverlay : public CCLayer {
 protected:
 	CCScale9Sprite* m_bg;
-	CCLabelBMFont* m_musicTitle;
-    CCLabelBMFont* m_musicArtist;
+	Label* m_musicTitle;
+    Label* m_musicArtist;
     CCLabelBMFont* m_unavailableLabel;
     CCLabelBMFont* m_autoLabel;
     CCMenu* m_menu;
@@ -48,12 +49,15 @@ protected:
 		this->addChildAtPosition(m_bg, Anchor::Center);
 
         if(pbm.m_mediaManager) {
-            m_musicTitle = CCLabelBMFont::create("No Song", "bigFont.fnt");
-            m_musicTitle->limitLabelWidth(360.f, 1, 0.1f);
+            m_musicTitle = Label::create("No Song", "font_default.fnt"_spr, 1.5);
+            m_musicTitle->addAllFonts();
+            m_musicTitle->limitLabelWidth(300.f, 1.5, 0.1f);
             this->addChildAtPosition(m_musicTitle, Anchor::Top, ccp(0, -20));
 
-            m_musicArtist = CCLabelBMFont::create("No Artist", "goldFont.fnt");
-            m_musicArtist->limitLabelWidth(360.f, 0.8, 0.1f);
+            m_musicArtist = Label::create("No Artist", "font_default.fnt"_spr);
+            m_musicArtist->addAllFonts();
+            m_musicArtist->setColor({253, 205, 52});
+            m_musicArtist->limitLabelWidth(300.f, 1.2, 0.1f);
             this->addChildAtPosition(m_musicArtist, Anchor::Top, ccp(0, -50));
 
             m_menu = CCMenu::create();
@@ -235,11 +239,11 @@ public:
             auto title = pbm.getCurrentSongTitle();
             auto artist = pbm.getCurrentSongArtist();
 
-            m_musicTitle->setString(title.has_value() ? title->c_str() : "No Song", true);
-            m_musicTitle->limitLabelWidth(360.f, 1, 0.1f);
+            m_musicTitle->setString(title.has_value() ? title->c_str() : "No Song");
+            m_musicTitle->limitLabelWidth(300.f, 1.5, 0.1f);
 
-            m_musicArtist->setString(artist.has_value() ? artist->c_str() : "No Artist", true);
-            m_musicArtist->limitLabelWidth(360.f, 0.8, 0.1f);
+            m_musicArtist->setString(artist.has_value() ? artist->c_str() : "No Artist");
+            m_musicArtist->limitLabelWidth(300.f, 1.2, 0.1f);
 
             auto status = pbm.isPlaybackActive();
 
@@ -262,14 +266,14 @@ public:
         if (!m_musicTitle || !pbm.m_mediaManager) return;
 
         m_musicTitle->setString(title.length() != 0 ? title.c_str() : "No Song");
-        m_musicTitle->limitLabelWidth(360.f, 1, 0.1f);
+        m_musicTitle->limitLabelWidth(300.f, 1.5, 0.1f);
     }
 
     void updateArtist(std::string artist) {
         if (!m_musicArtist || !pbm.m_mediaManager) return;
 
         m_musicArtist->setString(artist.length() != 0 ? artist.c_str() : "No Artist");
-        m_musicArtist->limitLabelWidth(360.f, 0.8, 0.1f);
+        m_musicArtist->limitLabelWidth(300.f, 1.2, 0.1f);
     }
 
     void togglePlaybackBtn(bool status) {

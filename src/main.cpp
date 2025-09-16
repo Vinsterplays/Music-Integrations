@@ -13,6 +13,8 @@
 #include "managers/MusicOverlayManager.cpp"
 #include "managers/PlaybackManager.hpp"
 
+#include <Windows.h>
+
 
 
 #define WINRT_CPPWINRT
@@ -21,6 +23,9 @@ bool m_isLoaded = false;
 
 $on_mod(Loaded) {
     PlaybackManager::get().getMediaManager();
+
+    auto dummy = Label::create("", "font_default.fnt"_spr);
+    dummy->addAllFonts();
 
     new geode::EventListener(+[](geode::GameEvent*) {
         m_isLoaded = true;

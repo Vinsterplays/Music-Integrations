@@ -1,5 +1,6 @@
 #include "PlaybackManager.hpp"
 #include "Geode/loader/Event.hpp"
+#include "Geode/loader/Log.hpp"
 #include "MusicOverlayManager.cpp"
 
 using SongUpdateEvent = DispatchEvent<std::string>;
@@ -30,50 +31,59 @@ bool PlaybackManager::getMediaManager() {
     auto async = GlobalSystemMediaTransportControlsSessionManager::RequestAsync();
     auto startTime = std::chrono::steady_clock::now();
 
+    auto attachToSession = [this] {
+        if (!m_mediaManager) return;
+        if (auto session = m_mediaManager.GetCurrentSession()) {
+            session.MediaPropertiesChanged([this](auto s, auto) {
+                if (!s || s != m_mediaManager.GetCurrentSession()) return;
+                Loader::get()->queueInMainThread([this, s] {
+                    static std::string lastTitle, lastArtist;
+                    auto props  = s.TryGetMediaPropertiesAsync().get();
+                    auto title  = winrt::to_string(props.Title());
+                    auto artist = winrt::to_string(props.Artist());
+                    if (title  != lastTitle)  { lastTitle  = title;  SongUpdateEvent("title-update"_spr,  title).post(); }
+                    if (artist != lastArtist) { lastArtist = artist; SongUpdateEvent("artist-update"_spr, artist).post(); }
+                });
+            });
+
+            session.PlaybackInfoChanged([this](auto s, auto) {
+                if (!s || s != m_mediaManager.GetCurrentSession()) return;
+                Loader::get()->queueInMainThread([this, s] {
+                    static GlobalSystemMediaTransportControlsSessionPlaybackStatus lastStatus{};
+                    auto status = s.GetPlaybackInfo().PlaybackStatus();
+                    if (status == lastStatus) return;
+                    lastStatus = status;
+                    PlaybackUpdateEvent("playback-update"_spr,
+                        status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing).post();
+                });
+            });
+
+            // optional snapshot so UI is correct right away
+            try {
+                auto props = session.TryGetMediaPropertiesAsync().get();
+                SongUpdateEvent("title-update"_spr,  winrt::to_string(props.Title())).post();
+                SongUpdateEvent("artist-update"_spr, winrt::to_string(props.Artist())).post();
+                auto st = session.GetPlaybackInfo().PlaybackStatus();
+                PlaybackUpdateEvent("playback-update"_spr,
+                    st == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing).post();
+            } catch (...) {}
+        }
+    };
+
     while (true) {
         auto status = async.Status();
 
         if (status == AsyncStatus::Completed) {
             try {
                 m_mediaManager = async.GetResults();
-                if (auto session = m_mediaManager.GetCurrentSession()) {
-                    session.MediaPropertiesChanged(
-                        [this](auto sess, auto) {
-                            Loader::get()->queueInMainThread([this, sess] {
-                                static std::string lastTitle;
-                                static std::string lastArtist;
-                                auto props = sess.TryGetMediaPropertiesAsync().get();
-                                auto title = winrt::to_string(props.Title());
-                                auto artist = winrt::to_string(props.Artist());
-                                if (title != lastTitle) {
-                                    lastTitle = title;
-                                    SongUpdateEvent("title-update"_spr, title).post();
-                                }
-                                if (artist != lastArtist) {
-                                    lastArtist = artist;
-                                    SongUpdateEvent("artist-update"_spr, artist).post();
-                                }
-                            });
-                        }
-                    );
-                    session.PlaybackInfoChanged(
-                        [this](auto sess, auto) {
-                            Loader::get()->queueInMainThread([this, sess] {
-                                static GlobalSystemMediaTransportControlsSessionPlaybackStatus lastStatus;
-                                auto info = sess.GetPlaybackInfo();
-                                auto status = info.PlaybackStatus();
-                                if (status == lastStatus) return;
-                                lastStatus = status;
-                                if (status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing) {
-                                    PlaybackUpdateEvent("playback-update"_spr, true).post();
-                                } else {
-                                    PlaybackUpdateEvent("playback-update"_spr, false).post();
-                                }
-                                
-                            });
-                        }
-                    );
-                }
+                m_mediaManager.CurrentSessionChanged(
+                    [this, attachToSession](auto, auto) {
+                        attachToSession();
+                    }
+                );
+
+                attachToSession();
+                
                 return true;
             } catch (const winrt::hresult_error & e) {
                 log::debug("Failed to get media session: {}", winrt::to_string(e.message()));

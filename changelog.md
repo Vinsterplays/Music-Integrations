@@ -1,3 +1,7 @@
+# 1.5.1
+- The overlay now supports Russian, Greek, Japanese, Thai, and Vietnamese
+- Fixed an issue where the overlay would sometimes not update when switching songs
+
 # 1.5.0
 - Rerewrote the entire mod again lmao
 - Updated to Geode 4.7.0

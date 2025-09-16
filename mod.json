@@ -1,14 +1,22 @@
 {
-	"geode": "4.7.0",
+	"geode": "4.8.0",
 	"gd": {
 		"win": "2.2074"
 	},
 	"id": "vinsterplays.music_integrations",
 	"name": "Music Integrations",
-	"version": "v1.5.0",
+	"version": "v1.5.1-beta",
 	"developer": "Vinsterplays",
-	"description": "Control YT/Spotify in the editor.",
+	"description": "Control YT/Spotify without tabbing out.",
 	"repository": "https://github.com/Vinsterplays/Music-Integrations",
 	"tags": ["music", "enhancement", "editor", "universal"],
-	"resources": {"sprites": ["resources/*.png"]}
+	"resources": {
+		"sprites": ["resources/*.png"],
+		"files": [
+			"resources/*.txt",
+			"resources/BitmapFonts/*.fnt",
+			"resources/BitmapFonts/*.png",
+			"resources/*.png"
+		]
+	}
 }

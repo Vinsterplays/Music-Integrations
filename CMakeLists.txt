@@ -45,5 +45,4 @@ add_subdirectory($ENV{GEODE_SDK} ${CMAKE_CURRENT_BINARY_DIR}/geode)
 # Link against windowsapp.lib
 target_link_libraries(${PROJECT_NAME} windowsapp)
 
-# Set up dependencies, resources, and link Geode.
 setup_geode_mod(${PROJECT_NAME})

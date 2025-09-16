@@ -1,9 +1,11 @@
 # Music Integrations
 
-Have you ever wanted to listen to your own music in the editor while not having to click off GD to pause your music when playtesting? This mod is for you! This mod will toggle music, videos, media (pretty much anything the pause button on your keyboard would do) automatically! Spotify and Youtube are confirmed to work, but many other types of media should work!
+Automatically toggles the playback of music playing through external media players (Youtube, Spotify, etc.) when music is playing ingame. You can access the overlay to quickly toggle auto playback or control the media player.
 
-HOLD **ALT** TO ACCESS OVERLAY!
+<co>HOLD **ALT** TO ACCESS OVERLAY!</co>
 
-## <cy>Disclaimer</c>
+While support for other platforms is planned, currently this mod is <cr>only available on Windows</cr>, sorry!
 
-While support for other platforms is planned, currently this mod is only available on Windows, sorry!
+## Special thanks to:
+- [Prevter](https://github.com/Prevter), for creating the label class used in the overlay
+- [Eclipse Menu](https://github.com/EclipseMenu/EclipseMenu), for providing all the fonts used in the overlay
