@@ -1,6 +1,7 @@
 # 1.5.1
 - The overlay now supports Russian, Greek, Japanese, Thai, and Vietnamese
 - Fixed an issue where the overlay would sometimes not update when switching songs
+- Fixed an issue where minimizing the game and closing a media player would crash the game
 
 # 1.5.0
 - Rerewrote the entire mod again lmao

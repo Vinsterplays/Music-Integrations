@@ -34,18 +34,19 @@ bool PlaybackManager::getMediaManager() {
     auto attachToSession = [this] {
         if (!m_mediaManager) return;
         if (auto session = m_mediaManager.GetCurrentSession()) {
+            static std::string lastSongName, lastArtistName;
+            static GlobalSystemMediaTransportControlsSessionPlaybackStatus lastStatus{};
             session.MediaPropertiesChanged([this](auto session, auto) {
                 auto op = session.TryGetMediaPropertiesAsync();
                 op.Completed([this, session](auto const& async2, auto) {
                     if (async2.Status() != AsyncStatus::Completed) return;
 
                     Loader::get()->queueInMainThread([this, session, async2] {
-                        static std::string lastTitle, lastArtist;
                         auto props = async2.GetResults();
                         auto title  = winrt::to_string(props.Title());
                         auto artist = winrt::to_string(props.Artist());
-                        if (title  != lastTitle)  { lastTitle  = title;  SongUpdateEvent("title-update"_spr,  title).post(); }
-                        if (artist != lastArtist) { lastArtist = artist; SongUpdateEvent("artist-update"_spr, artist).post(); }
+                        if (title  != lastSongName)  { lastSongName  = title;  SongUpdateEvent("title-update"_spr,  title).post(); }
+                        if (artist != lastArtistName) { lastArtistName = artist; SongUpdateEvent("artist-update"_spr, artist).post(); }
                     });
                 });
             });
@@ -53,7 +54,6 @@ bool PlaybackManager::getMediaManager() {
             session.PlaybackInfoChanged([this](auto s, auto) {
                 if (!s || s != m_mediaManager.GetCurrentSession()) return;
                 Loader::get()->queueInMainThread([this, s] {
-                    static GlobalSystemMediaTransportControlsSessionPlaybackStatus lastStatus{};
                     auto status = s.GetPlaybackInfo().PlaybackStatus();
                     if (status == lastStatus) return;
                     lastStatus = status;
@@ -62,15 +62,25 @@ bool PlaybackManager::getMediaManager() {
                 });
             });
 
-            // optional snapshot so UI is correct right away
-            try {
-                auto props = session.TryGetMediaPropertiesAsync().get();
-                SongUpdateEvent("title-update"_spr,  winrt::to_string(props.Title())).post();
-                SongUpdateEvent("artist-update"_spr, winrt::to_string(props.Artist())).post();
-                auto st = session.GetPlaybackInfo().PlaybackStatus();
+            auto op = session.TryGetMediaPropertiesAsync();
+                op.Completed([this, session](auto const& async2, auto) {
+                    if (async2.Status() != AsyncStatus::Completed) return;
+
+                    Loader::get()->queueInMainThread([this, session, async2] {
+                        auto props = async2.GetResults();
+                        auto title  = winrt::to_string(props.Title());
+                        auto artist = winrt::to_string(props.Artist());
+                        if (title  != lastSongName)  { lastSongName  = title;  SongUpdateEvent("title-update"_spr,  title).post(); }
+                        if (artist != lastArtistName) { lastArtistName = artist; SongUpdateEvent("artist-update"_spr, artist).post(); }
+                    });
+                });
+            Loader::get()->queueInMainThread([this, session] {
+                auto status = session.GetPlaybackInfo().PlaybackStatus();
+                if (status == lastStatus) return;
+                lastStatus = status;
                 PlaybackUpdateEvent("playback-update"_spr,
-                    st == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing).post();
-            } catch (...) {}
+                    status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing).post();
+            });
         }
     };
 
@@ -120,54 +130,34 @@ void PlaybackManager::removeMediaManager() {
 
 bool PlaybackManager::isPlaybackActive() {
     if (m_wine) return false;
-    try {
-        auto session = m_mediaManager.GetCurrentSession();
-        if (!session) return false;
-        bool result = session.GetPlaybackInfo().PlaybackStatus() == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing ? true : false;
-        return result;
-    } catch (const hresult_error & e) {
-        log::debug("Failed to get media session or playback info: {}", to_string(e.message().c_str()));
-        return false;
-    }
+    auto session = m_mediaManager.GetCurrentSession();
+    if (!session) return false;
+    bool result = session.GetPlaybackInfo().PlaybackStatus() == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing ? true : false;
+    return result;
 }
 
 bool PlaybackManager::control(bool play) {
     if (m_wine || !m_mediaManager || m_immune) return false;
-    try {
-        auto session = m_mediaManager.GetCurrentSession();
-        if (!session) return false;
-        play ? session.TryPlayAsync() : session.TryPauseAsync();
-        return true;
-    } catch (...) {
-        log::debug("Playback control error!");
-        return false;
-    }
+    auto session = m_mediaManager.GetCurrentSession();
+    if (!session) return false;
+    play ? session.TryPlayAsync() : session.TryPauseAsync();
+    return true;
 }
 
 bool PlaybackManager::skip(bool direction) {
     if (m_wine || !m_mediaManager) return false;
-    try {
-        auto session = m_mediaManager.GetCurrentSession();
-        if (!session) return false;
-        direction ? session.TrySkipNextAsync() : session.TrySkipPreviousAsync();
-        return true;
-    } catch (...) {
-        log::debug("Playback control error!");
-        return false;
-    }
+    auto session = m_mediaManager.GetCurrentSession();
+    if (!session) return false;
+    direction ? session.TrySkipNextAsync() : session.TrySkipPreviousAsync();
+    return true;
 }
 
 bool PlaybackManager::toggleControl() {
     if (m_wine || !m_mediaManager) return false;
-    try {
-        auto session = m_mediaManager.GetCurrentSession();
-        if (!session) return false;
-        session.TryTogglePlayPauseAsync();
-        return true;
-    } catch (...) {
-        log::debug("Playback control error!");
-        return false;
-    }
+    auto session = m_mediaManager.GetCurrentSession();
+    if (!session) return false;
+    session.TryTogglePlayPauseAsync();
+    return true;
 }
 
 std::optional<std::string> PlaybackManager::getCurrentSongTitle() {

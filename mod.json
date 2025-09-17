@@ -5,7 +5,7 @@
 	},
 	"id": "vinsterplays.music_integrations",
 	"name": "Music Integrations",
-	"version": "v1.5.1-beta",
+	"version": "v1.5.1",
 	"developer": "Vinsterplays",
 	"description": "Control YT/Spotify without tabbing out.",
 	"repository": "https://github.com/Vinsterplays/Music-Integrations",
