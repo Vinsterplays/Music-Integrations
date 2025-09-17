@@ -1,0 +1,1 @@
+If you like my work and want to support me, I have a [Ko-fi](https://ko-fi.com/vinsterplays)
