@@ -34,15 +34,19 @@ bool PlaybackManager::getMediaManager() {
     auto attachToSession = [this] {
         if (!m_mediaManager) return;
         if (auto session = m_mediaManager.GetCurrentSession()) {
-            session.MediaPropertiesChanged([this](auto s, auto) {
-                if (!s || s != m_mediaManager.GetCurrentSession()) return;
-                Loader::get()->queueInMainThread([this, s] {
-                    static std::string lastTitle, lastArtist;
-                    auto props  = s.TryGetMediaPropertiesAsync().get();
-                    auto title  = winrt::to_string(props.Title());
-                    auto artist = winrt::to_string(props.Artist());
-                    if (title  != lastTitle)  { lastTitle  = title;  SongUpdateEvent("title-update"_spr,  title).post(); }
-                    if (artist != lastArtist) { lastArtist = artist; SongUpdateEvent("artist-update"_spr, artist).post(); }
+            session.MediaPropertiesChanged([this](auto session, auto) {
+                auto op = session.TryGetMediaPropertiesAsync();
+                op.Completed([this, session](auto const& async2, auto) {
+                    if (async2.Status() != AsyncStatus::Completed) return;
+
+                    Loader::get()->queueInMainThread([this, session, async2] {
+                        static std::string lastTitle, lastArtist;
+                        auto props = async2.GetResults();
+                        auto title  = winrt::to_string(props.Title());
+                        auto artist = winrt::to_string(props.Artist());
+                        if (title  != lastTitle)  { lastTitle  = title;  SongUpdateEvent("title-update"_spr,  title).post(); }
+                        if (artist != lastArtist) { lastArtist = artist; SongUpdateEvent("artist-update"_spr, artist).post(); }
+                    });
                 });
             });
 
