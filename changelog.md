@@ -1,3 +1,6 @@
+# 1.5.3
+- Fixed an issue where the title and artist labels would scale outside the overlay
+
 # 1.5.1
 - The overlay now supports Russian, Greek, Japanese, Thai, and Vietnamese
 - Fixed an issue where the overlay would sometimes not update when switching songs
