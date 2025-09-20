@@ -521,7 +521,7 @@ void Label::limitLabelWidth(float width, float defaultScale, float minScale) {
     auto originalWidth = m_obContentSize.width;
     auto scale = defaultScale;
     if (originalWidth > width && width > 0.0f) {
-        scale = width / originalWidth;
+        scale = (width / originalWidth) * defaultScale;
     }
     if (defaultScale != 0.0f && defaultScale <= scale) {
         scale = defaultScale;

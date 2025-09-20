@@ -49,15 +49,15 @@ protected:
 		this->addChildAtPosition(m_bg, Anchor::Center);
 
         if(pbm.m_mediaManager) {
-            m_musicTitle = Label::create("No Song", "font_default.fnt"_spr, 1.5);
+            m_musicTitle = Label::create("No Song", "font_default.fnt"_spr);
             m_musicTitle->addAllFonts();
-            m_musicTitle->limitLabelWidth(300.f, 1.5, 0.1f);
+            m_musicTitle->limitLabelWidth(250.f, 1.5, 0.1f);
             this->addChildAtPosition(m_musicTitle, Anchor::Top, ccp(0, -20));
 
             m_musicArtist = Label::create("No Artist", "font_default.fnt"_spr);
             m_musicArtist->addAllFonts();
             m_musicArtist->setColor({253, 205, 52});
-            m_musicArtist->limitLabelWidth(300.f, 1.2, 0.1f);
+            m_musicArtist->limitLabelWidth(250.f, 1.2, 0.1f);
             this->addChildAtPosition(m_musicArtist, Anchor::Top, ccp(0, -50));
 
             m_menu = CCMenu::create();
@@ -240,10 +240,10 @@ public:
             auto artist = pbm.getCurrentSongArtist();
 
             m_musicTitle->setString(title.has_value() ? title->c_str() : "No Song");
-            m_musicTitle->limitLabelWidth(300.f, 1.5, 0.1f);
+            m_musicTitle->limitLabelWidth(250.f, 1.5, 0.1f);
 
             m_musicArtist->setString(artist.has_value() ? artist->c_str() : "No Artist");
-            m_musicArtist->limitLabelWidth(300.f, 1.2, 0.1f);
+            m_musicArtist->limitLabelWidth(250.f, 1.2, 0.1f);
 
             auto status = pbm.isPlaybackActive();
 
@@ -266,14 +266,14 @@ public:
         if (!m_musicTitle || !pbm.m_mediaManager) return;
 
         m_musicTitle->setString(title.length() != 0 ? title.c_str() : "No Song");
-        m_musicTitle->limitLabelWidth(300.f, 1.5, 0.1f);
+        m_musicTitle->limitLabelWidth(250.f, 1.5, 0.1f);
     }
 
     void updateArtist(std::string artist) {
         if (!m_musicArtist || !pbm.m_mediaManager) return;
 
         m_musicArtist->setString(artist.length() != 0 ? artist.c_str() : "No Artist");
-        m_musicArtist->limitLabelWidth(300.f, 1.2, 0.1f);
+        m_musicArtist->limitLabelWidth(250.f, 1.2, 0.1f);
     }
 
     void togglePlaybackBtn(bool status) {
