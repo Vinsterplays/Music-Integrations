@@ -3,6 +3,7 @@
 #include <Geode/Geode.hpp>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Media.Control.h>
+#include "Geode/loader/Event.hpp"
 
 #define WINRT_CPPWINRT
 
@@ -30,6 +31,13 @@ public:
 
     bool m_immune = false;
     bool m_active = false;
+
+    struct SongUpdateEvent : Event<SongUpdateEvent, bool(std::string), std::string> {
+        using Event::Event;
+    };
+    struct PlaybackUpdateEvent : SimpleEvent<PlaybackUpdateEvent, bool> {
+        using SimpleEvent::SimpleEvent;
+    };
 
     static PlaybackManager& get() {
         static PlaybackManager instance;

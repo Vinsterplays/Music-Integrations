@@ -9,17 +9,21 @@
 #include <Geode/modify/CustomSongWidget.hpp>
 #include <Geode/modify/EditorUI.hpp>
 #include <Geode/modify/PauseLayer.hpp>
+#include <Geode/modify/CCDirector.hpp>
 
 #include "managers/MusicOverlayManager.cpp"
 #include "managers/PlaybackManager.hpp"
+#include "managers/keybindManager/KeyPickerPopup.hpp"
+#include "managers/keybindManager/keybindManager.hpp"
 
 #include <Windows.h>
-
-
 
 #define WINRT_CPPWINRT
 
 bool m_isLoaded = false;
+bool m_rebindWindowOpen = false;
+
+enumKeyCodes getOverlayKey()   { return Mod::get()->getSettingValue<Keybind>("key_overlay").getKey(); };
 
 $on_mod(Loaded) {
     PlaybackManager::get().getMediaManager();
@@ -27,15 +31,21 @@ $on_mod(Loaded) {
     auto dummy = Label::create("", "font_default.fnt"_spr);
     dummy->addAllFonts();
 
-    new geode::EventListener(+[](geode::GameEvent*) {
+    GameEvent(geode::GameEventType::Loaded).listen([] {
         m_isLoaded = true;
-    }, geode::GameEventFilter(geode::GameEventType::Loaded));
+    }).leak();
+    RebindWindow().listen([](bool open) {
+        m_rebindWindowOpen = open;
+    }).leak();    
 }
 
-$on_mod(DataSaved) {
-    PlaybackManager::get().removeMediaManager();
-    log::debug("Goodbye!");
-}
+class $modify(CCDirector) {
+    void end() {
+        CCDirector::end();
+        PlaybackManager::get().removeMediaManager();
+        log::debug("Goodbye!");
+    }
+};
 
 
 //End goal is to stop relying on this
@@ -62,14 +72,16 @@ class $modify(FMODAudioEngine) {
 };
 
 class $modify (MyCCKeyboardDispatcher, CCKeyboardDispatcher) {
-    bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool repeat) {
-        if (key == enumKeyCodes::KEY_Alt
+    bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool repeat, double p3) {
+        if (m_rebindWindowOpen) {
+            KeybindSender().send(key);
+        } else if (key == getOverlayKey()
             && down
             && !repeat
             && m_isLoaded
         ) {
             MusicControlOverlay::get()->updateValues(true);
-        } else if (key == enumKeyCodes::KEY_Alt
+        } else if (key == getOverlayKey()
             && !down
             && m_isLoaded
         ) {
@@ -83,7 +95,7 @@ class $modify (MyCCKeyboardDispatcher, CCKeyboardDispatcher) {
             log::debug("immune: {}", pbm.m_immune);
         }
         #endif
-        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, repeat);
+        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, repeat, p3);
     }
 };
 

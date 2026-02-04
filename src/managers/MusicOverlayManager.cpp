@@ -20,12 +20,9 @@ protected:
     CCMenuItemSpriteExtra* m_skipBtn;
     CCMenuItemToggler* m_autoBtn;
     PlaybackManager pbm = PlaybackManager::get();
-    using SongUpdateListener = geode::EventListener<geode::DispatchFilter<std::string>>;
-    SongUpdateListener* m_titleListener = nullptr;
-    SongUpdateListener* m_artistListener = nullptr;
-    using PlaybackUpdateListener = geode::EventListener<geode::DispatchFilter<bool>>;
-    PlaybackUpdateListener* m_playbackListener = nullptr;
-    
+    ListenerHandle m_titleListener;
+    ListenerHandle m_artistListener;
+    ListenerHandle m_playbackListener;
 
 
 	bool init() override {
@@ -192,34 +189,24 @@ protected:
     void onEnter() override {
         CCLayer::onEnter();
         CCDirector::sharedDirector()->getTouchDispatcher()->addTargetedDelegate(this, -999, true);
-        m_titleListener = new EventListener([this](std::string title) {
+        m_titleListener = PlaybackManager::SongUpdateEvent("title-update"_spr).listen([this](auto title) {
             if (!title.empty()) this->updateTitle(title);
             return ListenerResult::Propagate;
-        }, geode::DispatchFilter<std::string>("title-update"_spr));
-        m_artistListener = new EventListener([this](std::string artist) {
+        });
+        m_artistListener = PlaybackManager::SongUpdateEvent("artist-update"_spr).listen([this](auto artist) {
             if (!artist.empty()) this->updateArtist(artist);
             return ListenerResult::Propagate;
-        }, geode::DispatchFilter<std::string>("artist-update"_spr));
-        m_playbackListener = new EventListener([this](bool status) {
+        });
+        m_playbackListener = PlaybackManager::PlaybackUpdateEvent().listen([this](bool status) {
             togglePlaybackBtn(status);
-            return ListenerResult::Propagate;
-        }, geode::DispatchFilter<bool>("playback-update"_spr));
+        });
     }
 
     void onExit() override {
         this->show(false);
-        if (m_titleListener) {
-            delete m_titleListener;
-            m_titleListener = nullptr;
-        }
-        if (m_artistListener) {
-            delete m_artistListener;
-            m_artistListener = nullptr;
-        }
-        if (m_playbackListener) {
-            delete m_playbackListener;
-            m_playbackListener = nullptr;
-        }
+        m_titleListener.destroy();
+        m_artistListener.destroy();
+        m_playbackListener.destroy();
         CCLayer::onExit();
     }
 

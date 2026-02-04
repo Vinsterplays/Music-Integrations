@@ -1,11 +1,11 @@
 {
-	"geode": "4.8.0",
+	"geode": "5.0.0-alpha.1",
 	"gd": {
-		"win": "2.2074"
+		"win": "2.2081"
 	},
 	"id": "vinsterplays.music_integrations",
 	"name": "Music Integrations",
-	"version": "v1.5.3",
+	"version": "v1.6.0-alpha.1",
 	"developer": "Vinsterplays",
 	"description": "Control YT/Spotify without tabbing out.",
 	"repository": "https://github.com/Vinsterplays/Music-Integrations",
@@ -18,5 +18,13 @@
 			"resources/BitmapFonts/*.png",
 			"resources/*.png"
 		]
+	},
+	"settings": {
+		"key_overlay": {
+			"type": "custom:keybind",
+			"name": "Quick Overlay Keybind",
+			"description": "Press this key to show the quick options overlay",
+			"default": 33
+		}
 	}
 }

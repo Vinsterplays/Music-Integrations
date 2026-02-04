@@ -1,10 +1,6 @@
 #include "PlaybackManager.hpp"
-#include "Geode/loader/Event.hpp"
 #include "Geode/loader/Log.hpp"
 #include "MusicOverlayManager.cpp"
-
-using SongUpdateEvent = DispatchEvent<std::string>;
-using PlaybackUpdateEvent = DispatchEvent<bool>;
 
 bool PlaybackManager::isWine() {
     static bool result = false;
@@ -45,8 +41,8 @@ bool PlaybackManager::getMediaManager() {
                         auto props = async2.GetResults();
                         auto title  = winrt::to_string(props.Title());
                         auto artist = winrt::to_string(props.Artist());
-                        if (title  != lastSongName)  { lastSongName  = title;  SongUpdateEvent("title-update"_spr,  title).post(); }
-                        if (artist != lastArtistName) { lastArtistName = artist; SongUpdateEvent("artist-update"_spr, artist).post(); }
+                        if (title  != lastSongName)  { lastSongName  = title;  SongUpdateEvent("title-update"_spr).send(title); }
+                        if (artist != lastArtistName) { lastArtistName = artist; SongUpdateEvent("artist-update"_spr).send(artist); }
                     });
                 });
             });
@@ -57,8 +53,7 @@ bool PlaybackManager::getMediaManager() {
                     auto status = s.GetPlaybackInfo().PlaybackStatus();
                     if (status == lastStatus) return;
                     lastStatus = status;
-                    PlaybackUpdateEvent("playback-update"_spr,
-                        status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing).post();
+                    PlaybackUpdateEvent().send(status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
                 });
             });
 
@@ -70,16 +65,15 @@ bool PlaybackManager::getMediaManager() {
                         auto props = async2.GetResults();
                         auto title  = winrt::to_string(props.Title());
                         auto artist = winrt::to_string(props.Artist());
-                        if (title  != lastSongName)  { lastSongName  = title;  SongUpdateEvent("title-update"_spr,  title).post(); }
-                        if (artist != lastArtistName) { lastArtistName = artist; SongUpdateEvent("artist-update"_spr, artist).post(); }
+                        if (title  != lastSongName)  { lastSongName  = title;  SongUpdateEvent("title-update"_spr).send(title); }
+                        if (artist != lastArtistName) { lastArtistName = artist; SongUpdateEvent("artist-update"_spr).send(artist); }
                     });
                 });
             Loader::get()->queueInMainThread([this, session] {
                 auto status = session.GetPlaybackInfo().PlaybackStatus();
                 if (status == lastStatus) return;
                 lastStatus = status;
-                PlaybackUpdateEvent("playback-update"_spr,
-                    status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing).post();
+                PlaybackUpdateEvent().send(status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
             });
         }
     };
