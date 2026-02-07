@@ -15,6 +15,8 @@
 #include "managers/PlaybackManager.hpp"
 #include "managers/keybindManager/KeyPickerPopup.hpp"
 #include "managers/keybindManager/keybindManager.hpp"
+#include "ui/linkSpotify.hpp"
+#include "managers/httpManager.hpp"
 
 #include <Windows.h>
 
@@ -22,6 +24,7 @@
 
 bool m_isLoaded = false;
 bool m_rebindWindowOpen = false;
+async::TaskHolder<web::WebResponse> m_listener;
 
 enumKeyCodes getOverlayKey()   { return Mod::get()->getSettingValue<Keybind>("key_overlay").getKey(); };
 
@@ -33,6 +36,55 @@ $on_mod(Loaded) {
 
     GameEvent(geode::GameEventType::Loaded).listen([] {
         m_isLoaded = true;
+        if (Mod::get()->getSavedValue<bool>("hasAuthorized") == false && PlaybackManager::get().isWindows() == false) {
+            createQuickPopup("Link Spotify", "Please link your Spotify account to use Music Integrations", "Link Now", "Close",
+                [](auto, bool btn2) {
+                    if (btn2) return;
+                    SpotifyAuth::get()->start([](std::string code) {
+                        log::debug("Got code: {}", code);
+                        auto req = web::WebRequest();
+
+                        m_listener.spawn(
+                            req.post("https://craftify.thatgravyboat.tech/api/v1/public/auth?type=auth&code=" + code),
+                            [](web::WebResponse value) {
+                                log::debug("received");
+                                auto jsonResult = value.json();
+                                if (!jsonResult.isOk()) {
+                                    log::error("Failed to parse JSON response");
+                                    return;
+                                }
+                                
+                                auto jsonUnwrap = jsonResult.unwrap();
+                                if (!jsonUnwrap.contains("access_token")) {
+                                    log::error("No access_token in response!");
+                                    return;
+                                }
+                                
+                                auto tokenResult = jsonUnwrap["access_token"].asString();
+                                if (!tokenResult.isOk()) {
+                                    log::error("Failed to get access_token as string");
+                                    return;
+                                }
+
+                                auto refreshResult = jsonUnwrap["refresh_token"].asString();
+                                if (!refreshResult.isOk()) {
+                                    log::error("Failed to get refresh_token as string");
+                                    return;
+                                }
+                                
+                                std::string token = tokenResult.unwrap();
+                                std::string refresh = refreshResult.unwrap();
+                                Mod::get()->setSavedValue("spotify-token", token);
+                                Mod::get()->setSavedValue("spotify-refresh", refresh);
+                                log::info("Successfully saved Spotify token");
+                                Mod::get()->setSavedValue("hasAuthorized", true);
+                            }
+                        );
+                    });
+                    web::openLinkInBrowser("https://accounts.spotify.com/authorize?client_id=7314a0ab3c734b2caa4b483032cdd91f&response_type=code&redirect_uri=http://127.0.0.1:21851/&scope=user-read-playback-state user-modify-playback-state");
+                }
+            );
+        }
     }).leak();
     RebindWindow().listen([](bool open) {
         m_rebindWindowOpen = open;
@@ -59,7 +111,7 @@ class $modify(FMODAudioEngine) {
 
         bool currentMusicState = FMODAudioEngine::isMusicPlaying(0);
         if (currentMusicState != lastMusicState) {
-            PlaybackManager pbm = PlaybackManager::get();
+            PlaybackManager& pbm = PlaybackManager::get();
             if (currentMusicState) {
                 pbm.control(false);
             } else {
@@ -89,7 +141,7 @@ class $modify (MyCCKeyboardDispatcher, CCKeyboardDispatcher) {
         } 
         #ifdef DEBUG_BUILD
         else if (key == enumKeyCodes::KEY_E && down) {
-            auto pbm = PlaybackManager::get();
+            PlaybackManager& pbm = PlaybackManager::get();
             log::debug("enabled: {}", Mod::get()->getSavedValue<bool>("autoEnabled"));
             log::debug("active: {}", pbm.m_active);
             log::debug("immune: {}", pbm.m_immune);
@@ -160,7 +212,7 @@ class $modify (EditorUI) {
     void onPlayback(CCObject* sender) {
         EditorUI::onPlayback(sender);
         if (!Mod::get()->getSavedValue<bool>("autoEnabled")) return;
-        PlaybackManager pbm = PlaybackManager::get();
+        PlaybackManager& pbm = PlaybackManager::get();
         if (EditorUI::m_playbackActive) {
             pbm.control(false);
         } else {

@@ -11,6 +11,7 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 project(MusicIntegrations VERSION 1.0.0)
 
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
+list(FILTER SOURCES EXCLUDE REGEX "src/server/.*")
 
 include_directories("${CMAKE_SOURCE_DIR}/include/winrt")
 
@@ -43,6 +44,8 @@ endif()
 add_subdirectory($ENV{GEODE_SDK} ${CMAKE_CURRENT_BINARY_DIR}/geode)
 
 # Link against windowsapp.lib
-target_link_libraries(${PROJECT_NAME} windowsapp)
+add_subdirectory(src/server)
 
 setup_geode_mod(${PROJECT_NAME})
+
+target_link_libraries(${PROJECT_NAME} windowsapp http_server)

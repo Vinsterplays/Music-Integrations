@@ -5,6 +5,7 @@
 #include <Geode/Geode.hpp>
 #include <Geode/loader/Dispatch.hpp>
 #include <Geode/ui/GeodeUI.hpp>
+#include <Geode/Utils.hpp>
 
 class MusicControlOverlay : public CCLayer {
 protected:
@@ -19,7 +20,7 @@ protected:
     CCMenuItemSpriteExtra* m_playbackBtn;
     CCMenuItemSpriteExtra* m_skipBtn;
     CCMenuItemToggler* m_autoBtn;
-    PlaybackManager pbm = PlaybackManager::get();
+    PlaybackManager& pbm = PlaybackManager::get();
     ListenerHandle m_titleListener;
     ListenerHandle m_artistListener;
     ListenerHandle m_playbackListener;
@@ -45,7 +46,7 @@ protected:
 		m_bg->setOpacity(205);
 		this->addChildAtPosition(m_bg, Anchor::Center);
 
-        if(pbm.m_mediaManager) {
+        if(pbm.m_mediaManager || !pbm.isWindows()) {
             m_musicTitle = Label::create("No Song", "font_default.fnt"_spr);
             m_musicTitle->addAllFonts();
             m_musicTitle->limitLabelWidth(250.f, 1.5, 0.1f);
@@ -231,15 +232,17 @@ public:
 
             m_musicArtist->setString(artist.has_value() ? artist->c_str() : "No Artist");
             m_musicArtist->limitLabelWidth(250.f, 1.2, 0.1f);
-
-            auto status = pbm.isPlaybackActive();
-
-            m_playbackBtn->setNormalImage(CCSprite::createWithSpriteFrameName(
-            status ? 
-                "GJ_pauseBtn_001.png" :
-                "GJ_playMusicBtn_001.png"
-            ));
-            m_playbackBtn->updateSprite();
+            
+            pbm.isPlaybackActive([this](bool isPlaying) {
+                auto status = isPlaying;
+                log::debug("Playback status: {}", status);
+                 m_playbackBtn->setNormalImage(CCSprite::createWithSpriteFrameName(
+                status ? 
+                    "GJ_pauseBtn_001.png" :
+                    "GJ_playMusicBtn_001.png"
+                ));
+                m_playbackBtn->updateSprite();
+            });
 
             if (Mod::get()->getSavedValue<bool>("autoEnabled")) {
                 m_autoBtn->toggle(true);

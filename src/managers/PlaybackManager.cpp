@@ -1,24 +1,29 @@
 #include "PlaybackManager.hpp"
 #include "Geode/loader/Log.hpp"
 #include "MusicOverlayManager.cpp"
+#include "httpManager.hpp"
 
-bool PlaybackManager::isWine() {
-    static bool result = false;
+bool PlaybackManager::isWindows() {
+    #ifdef GEODE_IS_WINDOWS
+    static bool wine = [] -> bool {
+        HMODULE hModule = GetModuleHandleA("ntdll.dll");
+        if (!hModule) return false;
+        FARPROC func = GetProcAddress(hModule, "wine_get_version");
+        if (!func) return false;
+        return true;
+    }();
+    return wine;
+    log::debug("Running on Windows: {}", !wine);
+    #else
+    return false;
+    log::debug("Running on Windows: {}", false);
+    #endif
 
-    HMODULE hModule = GetModuleHandleA("ntdll.dll");
-    if (!hModule) {
-        return false;
-    }
-
-    FARPROC func = GetProcAddress(hModule, "wine_get_version");
-    result = func != nullptr;
-    return result;
 }
 
 bool PlaybackManager::getMediaManager() {
-    if (isWine()) {
-        log::debug("Running on Wine, skipping media manager initialization.");
-        m_wine = true;
+    if (!isWindows()) {
+        log::debug("Running on non-Windows system, skipping media manager initialization.");
         return false;
     }
 
@@ -122,40 +127,88 @@ void PlaybackManager::removeMediaManager() {
     m_mediaManager = nullptr;
 }
 
-bool PlaybackManager::isPlaybackActive() {
-    if (m_wine) return false;
-    auto session = m_mediaManager.GetCurrentSession();
-    if (!session) return false;
-    bool result = session.GetPlaybackInfo().PlaybackStatus() == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing ? true : false;
-    return result;
+void PlaybackManager::isPlaybackActive(std::function<void(bool)> callback) {
+    if (!isWindows()) {
+        std::string token = Mod::get()->getSavedValue<std::string>("spotify-token", "");
+        if (token.empty()) {
+            log::error("No Spotify token available");
+            callback(false);
+            return;
+        }
+        spotifyisPlaybackActive(token, [callback](bool isPlaying) {
+            callback(isPlaying);
+        });
+    } else {
+        auto session = m_mediaManager.GetCurrentSession();
+        if (!session) callback(false);
+        bool result = session.GetPlaybackInfo().PlaybackStatus() == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing ? true : false;
+        callback(result);
+    }
 }
 
 bool PlaybackManager::control(bool play) {
-    if (m_wine || !m_mediaManager || m_immune) return false;
-    auto session = m_mediaManager.GetCurrentSession();
-    if (!session) return false;
-    play ? session.TryPlayAsync() : session.TryPauseAsync();
-    return true;
+    if (!isWindows()) {
+        std::string token = Mod::get()->getSavedValue<std::string>("spotify-token", "");
+        if (token.empty()) {
+            log::error("No Spotify token available");
+            return false;
+        }
+        PlaybackManager::get().spotifyControlRequest(Mod::get()->getSavedValue<std::string>("spotify-token", ""), 0, false);
+        return true;
+    } else {
+        if (!m_mediaManager || m_immune) return false;
+        auto session = m_mediaManager.GetCurrentSession();
+        if (!session) return false;
+        play ? session.TryPlayAsync() : session.TryPauseAsync();
+        return true;
+    }
 }
 
 bool PlaybackManager::skip(bool direction) {
-    if (m_wine || !m_mediaManager) return false;
-    auto session = m_mediaManager.GetCurrentSession();
-    if (!session) return false;
-    direction ? session.TrySkipNextAsync() : session.TrySkipPreviousAsync();
-    return true;
+     if (!isWindows()) {
+        std::string token = Mod::get()->getSavedValue<std::string>("spotify-token", "");
+        if (token.empty()) {
+            log::error("No Spotify token available");
+            return false;
+        }
+        PlaybackManager::get().spotifySkipRequest(Mod::get()->getSavedValue<std::string>("spotify-token", ""), 0, direction);
+        return true;
+     } else {
+        if (!m_mediaManager) return false;
+        auto session = m_mediaManager.GetCurrentSession();
+        if (!session) return false;
+        direction ? session.TrySkipNextAsync() : session.TrySkipPreviousAsync();
+        return true;
+     }
 }
 
 bool PlaybackManager::toggleControl() {
-    if (m_wine || !m_mediaManager) return false;
-    auto session = m_mediaManager.GetCurrentSession();
-    if (!session) return false;
-    session.TryTogglePlayPauseAsync();
-    return true;
+    log::debug("{}", isWindows());
+    if (!isWindows()) {
+        std::string token = Mod::get()->getSavedValue<std::string>("spotify-token", "");
+        if (token.empty()) {
+            log::error("No Spotify token available");
+            return false;
+        }
+        spotifyisPlaybackActive(token, [](bool isPlaying) {
+            if (isPlaying) {
+                PlaybackManager::get().spotifyControlRequest(Mod::get()->getSavedValue<std::string>("spotify-token", ""), 0, false);
+            } else {
+                PlaybackManager::get().spotifyControlRequest(Mod::get()->getSavedValue<std::string>("spotify-token", ""), 0, true);
+            }
+        });
+        return true;
+    } else {
+        if (!m_mediaManager) return false;
+        auto session = m_mediaManager.GetCurrentSession();
+        if (!session) return false;
+        session.TryTogglePlayPauseAsync();
+        return true;
+    }
 }
 
 std::optional<std::string> PlaybackManager::getCurrentSongTitle() {
-    if (m_wine) return std::nullopt;
+    if (!isWindows()) return std::nullopt;
 
     try {
         auto currentSession = m_mediaManager.GetCurrentSession();
@@ -173,7 +226,7 @@ std::optional<std::string> PlaybackManager::getCurrentSongTitle() {
 }
 
 std::optional<std::string> PlaybackManager::getCurrentSongArtist() {
-    if (m_wine) return std::nullopt;
+    if (!isWindows()) return std::nullopt;
 
     try {
         auto currentSession = m_mediaManager.GetCurrentSession();
@@ -188,4 +241,109 @@ std::optional<std::string> PlaybackManager::getCurrentSongArtist() {
     }
 
     return std::nullopt;
+}
+
+void PlaybackManager::spotifyControlRequest(std::string token, int retryCount, bool play) {
+    if (retryCount > 1) {
+        log::error("Max retries reached for control request");
+        return;
+    }
+    
+    auto req = web::WebRequest();
+    req.header("Authorization", fmt::format("Bearer {}", token));
+    req.header("Content-Length", "0");
+    req.bodyString("");
+    
+    m_listener.spawn(
+        req.put(play ? "https://api.spotify.com/v1/me/player/play" : "https://api.spotify.com/v1/me/player/pause"),
+        [this, retryCount, play, token](web::WebResponse value) {
+            if (value.code() == 401) {
+                log::debug("Token expired, refreshing... (attempt {})", retryCount + 1);
+                SpotifyAuth::get()->refresh([this, retryCount, play](std::string newToken) {
+                    log::debug("Token refreshed, retrying request");
+                    spotifyControlRequest(newToken, retryCount + 1, play);
+                });
+            } else if (value.ok()) {
+                log::debug("Successfully {} playback", play ? "started" : "paused");
+            } else {
+                log::error("Request failed with code: {} {}", value.code(), value.string());
+                log::error("Token: {}", token);
+            }
+        }
+    );
+}
+
+void PlaybackManager::spotifyisPlaybackActive(std::string token, std::function<void(bool)> callback,int retryCount) {
+    if (retryCount > 1) {
+        log::error("Max retries reached for playback info request");
+        callback(false);
+        return;
+    }
+    
+    auto req = web::WebRequest();
+    req.header("Authorization", fmt::format("Bearer {}", token));
+    
+    m_listener.spawn(
+        req.get("https://api.spotify.com/v1/me/player"),
+        [this, retryCount, callback, token](web::WebResponse value) {
+            if (value.code() == 401) {
+                log::debug("Token expired, refreshing... (attempt {})", retryCount + 1);
+                SpotifyAuth::get()->refresh([this, retryCount, callback](std::string newToken) {
+                    log::debug("Token refreshed, retrying request");
+                    spotifyisPlaybackActive(newToken, callback, retryCount + 1);
+                });
+            } else if (value.ok()) {
+                log::debug("Successfully retrieved playback info");
+                auto jsonResult = value.json();
+                if (!jsonResult.isOk()) {
+                    log::error("Failed to parse JSON response");
+                    log::error("Code: {}, Body: {}", value.code(), value.string());
+                    callback(false);
+                    return;
+                }
+                auto jsonUnwrap = jsonResult.unwrap();
+                if (!jsonUnwrap.contains("is_playing")) {
+                    log::error("No is_playing field in response!");
+                    log::error("Code: {}, Body: {}", value.code(), value.string());
+                    callback(false);
+                    return;
+                }
+                callback(jsonUnwrap["is_playing"].asBool().unwrap());
+            } else {
+                log::error("Request failed with code: {} {}", value.code(), value.string());
+                log::error("Token: {}", token);
+                callback(false);
+            }
+        }
+    );
+}
+
+void PlaybackManager::spotifySkipRequest(std::string token, int retryCount, bool direction) {
+    if (retryCount > 1) {
+        log::error("Max retries reached for control request");
+        return;
+    }
+    
+    auto req = web::WebRequest();
+    req.header("Authorization", fmt::format("Bearer {}", token));
+    req.header("Content-Length", "0");
+    req.bodyString("");
+    
+    m_listener.spawn(
+        req.post(direction ? "https://api.spotify.com/v1/me/player/next" : "https://api.spotify.com/v1/me/player/previous"),
+        [this, retryCount, direction, token](web::WebResponse value) {
+            if (value.code() == 401) {
+                log::debug("Token expired, refreshing... (attempt {})", retryCount + 1);
+                SpotifyAuth::get()->refresh([this, retryCount, direction](std::string newToken) {
+                    log::debug("Token refreshed, retrying request");
+                    spotifySkipRequest(newToken, retryCount + 1, direction);
+                });
+            } else if (value.ok()) {
+                log::debug("Successfully skipped track: {}", direction ? "next" : "previous");
+            } else {
+                log::error("Request failed with code: {} {}", value.code(), value.string());
+                log::error("Token: {}", token);
+            }
+        }
+    );
 }

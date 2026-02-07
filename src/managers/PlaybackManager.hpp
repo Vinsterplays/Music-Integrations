@@ -14,20 +14,22 @@ using namespace Windows::Media::Control;
 
 class PlaybackManager {
 protected:
-    PlaybackManager() {}
+    PlaybackManager() = default;
+    async::TaskHolder<web::WebResponse> m_listener;
+    void spotifyControlRequest(std::string token, int retryCount = 0, bool play = true);
+    void spotifyisPlaybackActive(std::string token, std::function<void(bool)> callback,int retryCount = 0);
+    void spotifySkipRequest(std::string token, int retryCount = 0, bool direction = true);
 public:
     GlobalSystemMediaTransportControlsSessionManager m_mediaManager = nullptr;
-    bool isWine();
+    bool isWindows();
     bool getMediaManager();
     void removeMediaManager();
     bool control(bool play);
     bool skip(bool direction);
     bool toggleControl();
-    bool isPlaybackActive();
+    void isPlaybackActive(std::function<void(bool)> callback);
     std::optional<std::string> getCurrentSongTitle();
     std::optional<std::string> getCurrentSongArtist();
-    
-    bool m_wine = false;
 
     bool m_immune = false;
     bool m_active = false;
@@ -41,6 +43,9 @@ public:
 
     static PlaybackManager& get() {
         static PlaybackManager instance;
-        return instance; 
+        return instance;
     }
+    
+    PlaybackManager(const PlaybackManager&) = delete;
+    PlaybackManager& operator=(const PlaybackManager&) = delete;
 };

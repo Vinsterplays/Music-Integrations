@@ -1,3 +1,5 @@
+//Mostly stolen from custom textboxes mod
+
 // custom keybinds mod doesn't support ignoring modifier keys like shift and alt
 // so i have to code an entirely new key picker
 
