@@ -3,6 +3,7 @@
 #include <Geode/Geode.hpp>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Media.Control.h>
+#include <winrt/Windows.Storage.Streams.h>
 #include "Geode/loader/Event.hpp"
 
 #define WINRT_CPPWINRT
@@ -30,6 +31,7 @@ public:
     void isPlaybackActive(std::function<void(bool)> callback);
     std::optional<std::string> getCurrentSongTitle();
     std::optional<std::string> getCurrentSongArtist();
+    void spotifyGetPlaybackInfo(std::string token, int retryCount = 0);
 
     bool m_immune = false;
     bool m_active = false;
@@ -37,8 +39,11 @@ public:
     struct SongUpdateEvent : Event<SongUpdateEvent, bool(std::string), std::string> {
         using Event::Event;
     };
-    struct PlaybackUpdateEvent : SimpleEvent<PlaybackUpdateEvent, bool> {
-        using SimpleEvent::SimpleEvent;
+    struct PlaybackUpdateEvent : ThreadSafeEvent<PlaybackUpdateEvent, bool(bool status), std::string> {
+        using ThreadSafeEvent::ThreadSafeEvent;
+    };
+    struct RateLimitUpdate : Event<RateLimitUpdate, bool(), std::string> {
+        using Event::Event;
     };
 
     static PlaybackManager& get() {

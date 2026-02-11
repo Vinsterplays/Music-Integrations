@@ -58,7 +58,7 @@ bool PlaybackManager::getMediaManager() {
                     auto status = s.GetPlaybackInfo().PlaybackStatus();
                     if (status == lastStatus) return;
                     lastStatus = status;
-                    PlaybackUpdateEvent().send(status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
+                    PlaybackUpdateEvent("playback-update"_spr).send(status ==GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
                 });
             });
 
@@ -78,7 +78,7 @@ bool PlaybackManager::getMediaManager() {
                 auto status = session.GetPlaybackInfo().PlaybackStatus();
                 if (status == lastStatus) return;
                 lastStatus = status;
-                PlaybackUpdateEvent().send(status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
+                PlaybackUpdateEvent("playback-update"_spr).send(status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
             });
         }
     };
@@ -128,7 +128,7 @@ void PlaybackManager::removeMediaManager() {
 }
 
 void PlaybackManager::isPlaybackActive(std::function<void(bool)> callback) {
-    if (!isWindows()) {
+    if (Mod::get()->getSavedValue<bool>("hasAuthorized") && !isWindows()) {
         std::string token = Mod::get()->getSavedValue<std::string>("spotify-token", "");
         if (token.empty()) {
             log::error("No Spotify token available");
@@ -147,13 +147,13 @@ void PlaybackManager::isPlaybackActive(std::function<void(bool)> callback) {
 }
 
 bool PlaybackManager::control(bool play) {
-    if (!isWindows()) {
+    if (Mod::get()->getSavedValue<bool>("hasAuthorized") && !isWindows()) {
         std::string token = Mod::get()->getSavedValue<std::string>("spotify-token", "");
         if (token.empty()) {
             log::error("No Spotify token available");
             return false;
         }
-        PlaybackManager::get().spotifyControlRequest(Mod::get()->getSavedValue<std::string>("spotify-token", ""), 0, false);
+        PlaybackManager::get().spotifyControlRequest(Mod::get()->getSavedValue<std::string>("spotify-token", ""), 0, play);
         return true;
     } else {
         if (!m_mediaManager || m_immune) return false;
@@ -165,7 +165,7 @@ bool PlaybackManager::control(bool play) {
 }
 
 bool PlaybackManager::skip(bool direction) {
-     if (!isWindows()) {
+     if (Mod::get()->getSavedValue<bool>("hasAuthorized") && !isWindows()) {
         std::string token = Mod::get()->getSavedValue<std::string>("spotify-token", "");
         if (token.empty()) {
             log::error("No Spotify token available");
@@ -183,19 +183,14 @@ bool PlaybackManager::skip(bool direction) {
 }
 
 bool PlaybackManager::toggleControl() {
-    log::debug("{}", isWindows());
-    if (!isWindows()) {
+    if (Mod::get()->getSavedValue<bool>("hasAuthorized") && !isWindows()) {
         std::string token = Mod::get()->getSavedValue<std::string>("spotify-token", "");
         if (token.empty()) {
             log::error("No Spotify token available");
             return false;
         }
         spotifyisPlaybackActive(token, [](bool isPlaying) {
-            if (isPlaying) {
-                PlaybackManager::get().spotifyControlRequest(Mod::get()->getSavedValue<std::string>("spotify-token", ""), 0, false);
-            } else {
-                PlaybackManager::get().spotifyControlRequest(Mod::get()->getSavedValue<std::string>("spotify-token", ""), 0, true);
-            }
+                PlaybackManager::get().spotifyControlRequest(Mod::get()->getSavedValue<std::string>("spotify-token", ""), 0, !isPlaying);
         });
         return true;
     } else {
@@ -255,14 +250,19 @@ void PlaybackManager::spotifyControlRequest(std::string token, int retryCount, b
     req.bodyString("");
     
     m_listener.spawn(
-        req.put(play ? "https://api.spotify.com/v1/me/player/play" : "https://api.spotify.com/v1/me/player/pause"),
+        req.put(play ? "https://api.spotify.com/v1/me/player/play" : "https://api.spotify.com/v1/me/player/pause", geode::getMod()),
         [this, retryCount, play, token](web::WebResponse value) {
+            RateLimitUpdate("rate-limit-update"_spr).send();
             if (value.code() == 401) {
                 log::debug("Token expired, refreshing... (attempt {})", retryCount + 1);
                 SpotifyAuth::get()->refresh([this, retryCount, play](std::string newToken) {
                     log::debug("Token refreshed, retrying request");
                     spotifyControlRequest(newToken, retryCount + 1, play);
                 });
+            } else if (value.code() == 500) {
+                Mod::get()->setSavedValue<bool>("hasAuthorized", false);
+            } else if (value.code() == 404) {
+                log::debug("No active device");
             } else if (value.ok()) {
                 log::debug("Successfully {} playback", play ? "started" : "paused");
             } else {
@@ -286,12 +286,17 @@ void PlaybackManager::spotifyisPlaybackActive(std::string token, std::function<v
     m_listener.spawn(
         req.get("https://api.spotify.com/v1/me/player"),
         [this, retryCount, callback, token](web::WebResponse value) {
+            RateLimitUpdate("rate-limit-update"_spr).send();
             if (value.code() == 401) {
                 log::debug("Token expired, refreshing... (attempt {})", retryCount + 1);
                 SpotifyAuth::get()->refresh([this, retryCount, callback](std::string newToken) {
                     log::debug("Token refreshed, retrying request");
                     spotifyisPlaybackActive(newToken, callback, retryCount + 1);
                 });
+            } else if (value.code() == 500) {
+                Mod::get()->setSavedValue<bool>("hasAuthorized", false);
+            } else if (value.code() == 204) {
+                log::debug("No active device");
             } else if (value.ok()) {
                 log::debug("Successfully retrieved playback info");
                 auto jsonResult = value.json();
@@ -330,20 +335,120 @@ void PlaybackManager::spotifySkipRequest(std::string token, int retryCount, bool
     req.bodyString("");
     
     m_listener.spawn(
-        req.post(direction ? "https://api.spotify.com/v1/me/player/next" : "https://api.spotify.com/v1/me/player/previous"),
+        req.post(direction ? "https://api.spotify.com/v1/me/player/next" : "https://api.spotify.com/v1/me/player/previous", geode::getMod()),
         [this, retryCount, direction, token](web::WebResponse value) {
+            RateLimitUpdate("rate-limit-update"_spr).send();
             if (value.code() == 401) {
                 log::debug("Token expired, refreshing... (attempt {})", retryCount + 1);
                 SpotifyAuth::get()->refresh([this, retryCount, direction](std::string newToken) {
                     log::debug("Token refreshed, retrying request");
                     spotifySkipRequest(newToken, retryCount + 1, direction);
                 });
+            } else if (value.code() == 500) {
+                Mod::get()->setSavedValue<bool>("hasAuthorized", false);
             } else if (value.ok()) {
                 log::debug("Successfully skipped track: {}", direction ? "next" : "previous");
+            } else if (value.code() == 404) {
+                log::debug("No active device");
             } else {
                 log::error("Request failed with code: {} {}", value.code(), value.string());
                 log::error("Token: {}", token);
             }
+        }
+    );
+}
+
+void PlaybackManager::spotifyGetPlaybackInfo(std::string token, int retryCount) {
+    if (retryCount > 1) {
+        log::error("Max retries reached for playback info request");
+        return;
+    }
+
+    web::WebRequest req;
+    req.header("Authorization", fmt::format("Bearer {}", token));
+
+    m_listener.spawn(
+        req.get("https://api.spotify.com/v1/me/player/currently-playing", geode::getMod()),
+        [this, retryCount, token](web::WebResponse value) {
+            RateLimitUpdate("rate-limit-update"_spr).send();
+            if (value.code() == 401) {
+                log::debug("Token expired, refreshing");
+                SpotifyAuth::get()->refresh([this, retryCount](std::string newToken) {
+                    spotifyGetPlaybackInfo(newToken, retryCount + 1);
+                });
+                return;
+            } else if (value.code() == 500) {
+                Mod::get()->setSavedValue<bool>("hasAuthorized", false);
+                return;
+            } else if (value.code() == 204) {
+                log::debug("No active device");
+                return;
+            } 
+
+            if (!value.ok()) {
+                log::error("Playback request failed: {} {}", value.code(), value.string());
+                return;
+            }
+
+            auto jsonResult = value.json();
+            if (!jsonResult.isOk()) {
+                log::error("Failed to parse playback JSON");
+                log::error("Code: {}, Body: {}", value.code(), value.string());
+                return;
+            }
+
+            auto root = jsonResult.unwrap();
+
+            if (!root.contains("currently_playing_type") ||
+                root["currently_playing_type"].asString().unwrapOr("") != "track") {
+                log::debug("Nothing playable right now");
+                return;
+            }
+
+            if (!root.contains("item")) {
+                log::error("Playback response missing item");
+                return;
+            }
+
+            auto item = root["item"];
+            if (item.isNull() || !item.isObject()) {
+                log::debug("Item is null, probably an ad or unsupported content");
+                return;
+            }
+
+            auto titleOpt = item["name"].asString();
+            if (!titleOpt.isOk()) {
+                log::error("Track missing name");
+                return;
+            }
+
+            auto artists = item["artists"].asArray();
+            if (!artists.isOk() || artists.unwrap().empty()) {
+                log::error("Track missing artists");
+                return;
+            }
+
+            auto artistOpt = artists.unwrap()[0]["name"].asString();
+            if (!artistOpt.isOk()) {
+                log::error("Artist missing name");
+                return;
+            }
+
+            auto cover = item["album"]["images"].asArray();
+            if (!cover.isOk() || cover.unwrap().empty()) {
+                log::error("Track missing cover");
+                return;
+            }
+
+            auto coverOpt = cover.unwrap()[0]["url"].asString();
+            if (!coverOpt.isOk()) {
+                log::error("Cover missing URL");
+                return;
+            }
+
+            SongUpdateEvent("title-update"_spr).send(titleOpt.unwrap());
+            SongUpdateEvent("artist-update"_spr).send(artistOpt.unwrap());
+            SongUpdateEvent("image-update"_spr).send(coverOpt.unwrap());
         }
     );
 }

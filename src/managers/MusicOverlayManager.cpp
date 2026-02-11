@@ -6,12 +6,16 @@
 #include <Geode/loader/Dispatch.hpp>
 #include <Geode/ui/GeodeUI.hpp>
 #include <Geode/Utils.hpp>
+#include <arc/time/Sleep.hpp>
+
+using namespace geode::prelude;
 
 class MusicControlOverlay : public CCLayer {
 protected:
 	CCScale9Sprite* m_bg;
 	Label* m_musicTitle;
     Label* m_musicArtist;
+    LazySprite* m_musicImage;
     CCLabelBMFont* m_unavailableLabel;
     CCLabelBMFont* m_autoLabel;
     CCMenu* m_menu;
@@ -23,7 +27,11 @@ protected:
     PlaybackManager& pbm = PlaybackManager::get();
     ListenerHandle m_titleListener;
     ListenerHandle m_artistListener;
+    ListenerHandle m_imageListener;
     ListenerHandle m_playbackListener;
+
+    arc::TaskHandle<void> m_pollingTask;
+    bool m_pollingToggle = false;
 
 
 	bool init() override {
@@ -34,7 +42,7 @@ protected:
         auto touchDispatcher = CCDirector::sharedDirector()->getTouchDispatcher();
         touchDispatcher->addTargetedDelegate(this, -999, true);
 		this->setAnchorPoint({ 1, 0 });
-		this->setContentSize({ 400, 125 });
+		this->setContentSize({ 450, 125 });
 		this->setScale(.5f);
         this->setZOrder(130);
 
@@ -46,17 +54,24 @@ protected:
 		m_bg->setOpacity(205);
 		this->addChildAtPosition(m_bg, Anchor::Center);
 
-        if(pbm.m_mediaManager || !pbm.isWindows()) {
+        if(pbm.m_mediaManager || Mod::get()->getSavedValue<bool>("hasAuthorized")) {
             m_musicTitle = Label::create("No Song", "font_default.fnt"_spr);
             m_musicTitle->addAllFonts();
             m_musicTitle->limitLabelWidth(250.f, 1.5, 0.1f);
-            this->addChildAtPosition(m_musicTitle, Anchor::Top, ccp(0, -20));
+            m_musicTitle->setAnchorPoint({0.f, 0.5f});
+            this->addChildAtPosition(m_musicTitle, Anchor::Top, ccp(-100, -25));
 
             m_musicArtist = Label::create("No Artist", "font_default.fnt"_spr);
             m_musicArtist->addAllFonts();
             m_musicArtist->setColor({253, 205, 52});
-            m_musicArtist->limitLabelWidth(250.f, 1.2, 0.1f);
-            this->addChildAtPosition(m_musicArtist, Anchor::Top, ccp(0, -50));
+            m_musicArtist->limitLabelWidth(250.f, 1.2, 0.1f); 
+            m_musicArtist->setAnchorPoint({0.f, 0.5f});
+            this->addChildAtPosition(m_musicArtist, Anchor::Top, ccp(-100, -55));
+
+            m_musicImage = LazySprite::create({this->getContentSize().height*0.85f, this->getContentSize().height*0.85f});
+            m_musicImage->setAutoResize(true);
+            this->addChildAtPosition(m_musicImage, Anchor::Left, ccp(10 + m_musicImage->getContentSize().width/2, 0));
+            m_musicImage->initWithFile(fmt::format("{}/default.png", Mod::get()->getID()).c_str());
 
             m_menu = CCMenu::create();
             m_menu->setContentSize({this->getContentSize().width*0.75f, this->getContentSize().height/2});
@@ -158,7 +173,7 @@ protected:
              auto pos = AnchorLayout::getAnchoredPosition(this->getParent(), Anchor::BottomRight, ccp(5, 10));
 		    this->runAction(CCEaseExponentialOut::create(CCMoveTo::create(0.75f, pos)));
         } else {
-            auto pos = AnchorLayout::getAnchoredPosition(this->getParent(), Anchor::BottomRight, ccp(205, 10));
+            auto pos = AnchorLayout::getAnchoredPosition(this->getParent(), Anchor::BottomRight, ccp(230, 10));
 		    this->runAction(CCEaseExponentialOut::create(CCMoveTo::create(0.75f, pos)));
         }
     }
@@ -190,6 +205,30 @@ protected:
     void onEnter() override {
         CCLayer::onEnter();
         CCDirector::sharedDirector()->getTouchDispatcher()->addTargetedDelegate(this, -999, true);
+        if(Mod::get()->getSavedValue<bool>("hasAuthorized") && !pbm.isWindows()) {
+            std::string token = Mod::get()->getSavedValue<std::string>("spotify-token", "");
+            if (token.empty()) {
+                log::error("No Spotify token available");
+                return;
+            }
+            arc::Notify notify;
+
+            async::spawn([notify] -> arc::Future<> {
+                while (true) {
+                    notify.notifyOne();
+                    co_await arc::sleep(asp::Duration::fromSecs(3));
+                }
+            });
+
+            m_pollingTask = async::spawn([notify, token, this] -> arc::Future<> {
+                while (true) {
+                    co_await notify.notified();
+                    if (m_pollingToggle && Mod::get()->getSavedValue<bool>("hasAuthorized")) {
+                        PlaybackManager::get().spotifyGetPlaybackInfo(token, 0);
+                    }
+                }
+            });
+        }
         m_titleListener = PlaybackManager::SongUpdateEvent("title-update"_spr).listen([this](auto title) {
             if (!title.empty()) this->updateTitle(title);
             return ListenerResult::Propagate;
@@ -198,7 +237,14 @@ protected:
             if (!artist.empty()) this->updateArtist(artist);
             return ListenerResult::Propagate;
         });
-        m_playbackListener = PlaybackManager::PlaybackUpdateEvent().listen([this](bool status) {
+
+        if (!pbm.m_mediaManager) {
+            m_imageListener = PlaybackManager::SongUpdateEvent("image-update"_spr).listen([this](auto image) {
+                if (!image.empty()) this->updateImageFromUrl(image);
+                return ListenerResult::Propagate;
+            });
+        }
+        m_playbackListener = PlaybackManager::PlaybackUpdateEvent("playback-update"_spr).listen([this](bool status) {
             togglePlaybackBtn(status);
         });
     }
@@ -208,6 +254,7 @@ protected:
         m_titleListener.destroy();
         m_artistListener.destroy();
         m_playbackListener.destroy();
+        if (m_pollingTask.isValid()) m_pollingTask.abort();
         CCLayer::onExit();
     }
 
@@ -236,7 +283,7 @@ public:
             pbm.isPlaybackActive([this](bool isPlaying) {
                 auto status = isPlaying;
                 log::debug("Playback status: {}", status);
-                 m_playbackBtn->setNormalImage(CCSprite::createWithSpriteFrameName(
+                m_playbackBtn->setNormalImage(CCSprite::createWithSpriteFrameName(
                 status ? 
                     "GJ_pauseBtn_001.png" :
                     "GJ_playMusicBtn_001.png"
@@ -244,31 +291,44 @@ public:
                 m_playbackBtn->updateSprite();
             });
 
-            if (Mod::get()->getSavedValue<bool>("autoEnabled")) {
-                m_autoBtn->toggle(true);
-            }
+
+        } else if (Mod::get()->getSavedValue<bool>("hasAuthorized") && !pbm.isWindows()) {
+            m_pollingToggle = show;
         }
-        
+        if (Mod::get()->getSavedValue<bool>("autoEnabled")) {
+            m_autoBtn->toggle(true);
+        }
 		this->show(show);
 	}
 
     void updateTitle(std::string title) {
-        if (!m_musicTitle || !pbm.m_mediaManager) return;
+        if (!m_musicTitle) return;
 
         m_musicTitle->setString(title.length() != 0 ? title.c_str() : "No Song");
         m_musicTitle->limitLabelWidth(250.f, 1.5, 0.1f);
     }
 
     void updateArtist(std::string artist) {
-        if (!m_musicArtist || !pbm.m_mediaManager) return;
+        if (!m_musicArtist) return;
 
         m_musicArtist->setString(artist.length() != 0 ? artist.c_str() : "No Artist");
         m_musicArtist->limitLabelWidth(250.f, 1.2, 0.1f);
     }
 
-    void togglePlaybackBtn(bool status) {
-        if (!m_playbackBtn || !pbm.m_mediaManager) return;
+    void updateImageFromUrl(std::string url) {
+        if (!m_musicImage || url.empty()) return;
 
+        this->removeChild(m_musicImage);
+        m_musicImage = LazySprite::create({this->getContentSize().height*0.85f, this->getContentSize().height*0.85f}, true);
+        this->addChildAtPosition(m_musicImage, Anchor::Left, ccp(10 + m_musicImage->getContentSize().width/2, 0));
+        m_musicImage->setAutoResize(true);
+        m_musicImage->loadFromUrl(url);
+    }
+
+    void togglePlaybackBtn(bool status) {
+        if (!m_playbackBtn) return;
+
+        log::debug("toggling: {}", status);
         m_playbackBtn->setNormalImage(CCSprite::createWithSpriteFrameName(
             status ? 
                 "GJ_pauseBtn_001.png" :

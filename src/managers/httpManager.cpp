@@ -28,13 +28,9 @@ void SpotifyAuth::stop() {
 
 void SpotifyAuth::refresh(std::function<void(std::string)> callback) {
     auto req = web::WebRequest();
-    req.onProgress([](web::WebProgress const& progress) {
-        log::debug("Progress: {}", progress.downloadProgress());
-    });
     m_listener.spawn(
-        req.post("https://craftify.thatgravyboat.tech/api/v1/public/auth?type=refresh&code=" + Mod::get()->getSavedValue<std::string>("spotify-refresh", "")),
+        req.post("https://craftify.thatgravyboat.tech/api/v1/public/auth?type=refresh&code=" + Mod::get()->getSavedValue<std::string>("spotify-refresh", ""), geode::getMod()),
         [callback](web::WebResponse value) {
-            log::debug("received");
             auto jsonResult = value.json();
             if (!jsonResult.isOk()) {
                 log::error("Failed to parse JSON response");
@@ -43,6 +39,11 @@ void SpotifyAuth::refresh(std::function<void(std::string)> callback) {
             
             auto jsonUnwrap = jsonResult.unwrap();
             if (!jsonUnwrap.contains("access_token")) {
+                 if (value.code() == 500) {
+                    log::debug("Authorization revoked");
+                    Mod::get()->setSavedValue<bool>("hasAuthorized", false);
+                    return;
+                }
                 log::error("No access_token in response!");
                 log::error("Code: {}, Body: {}", value.code(), value.string());
                 return;

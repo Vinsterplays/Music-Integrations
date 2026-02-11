@@ -24,6 +24,7 @@
 
 bool m_isLoaded = false;
 bool m_rebindWindowOpen = false;
+int m_rateLimitCounter = 0;
 async::TaskHolder<web::WebResponse> m_listener;
 
 enumKeyCodes getOverlayKey()   { return Mod::get()->getSettingValue<Keybind>("key_overlay").getKey(); };
@@ -34,6 +35,12 @@ $on_mod(Loaded) {
     auto dummy = Label::create("", "font_default.fnt"_spr);
     dummy->addAllFonts();
 
+    if (Mod::get()->getSavedValue<bool>("hasAuthorized") && !PlaybackManager::get().isWindows()) {
+        SpotifyAuth::get()->refresh([](std::string newToken) {
+            log::debug("Token refreshed on load");
+        });
+    }
+
     GameEvent(geode::GameEventType::Loaded).listen([] {
         m_isLoaded = true;
         if (Mod::get()->getSavedValue<bool>("hasAuthorized") == false && PlaybackManager::get().isWindows() == false) {
@@ -41,13 +48,11 @@ $on_mod(Loaded) {
                 [](auto, bool btn2) {
                     if (btn2) return;
                     SpotifyAuth::get()->start([](std::string code) {
-                        log::debug("Got code: {}", code);
                         auto req = web::WebRequest();
 
                         m_listener.spawn(
-                            req.post("https://craftify.thatgravyboat.tech/api/v1/public/auth?type=auth&code=" + code),
+                            req.post("https://craftify.thatgravyboat.tech/api/v1/public/auth?type=auth&code=" + code, geode::getMod()),
                             [](web::WebResponse value) {
-                                log::debug("received");
                                 auto jsonResult = value.json();
                                 if (!jsonResult.isOk()) {
                                     log::error("Failed to parse JSON response");
@@ -85,8 +90,37 @@ $on_mod(Loaded) {
                 }
             );
         }
+
+        arc::Notify notify;
+
+        PlaybackManager::RateLimitUpdate("rate-limit-update"_spr).listen([] {
+            m_rateLimitCounter += 1;
+            if (m_rateLimitCounter >= 10) {
+                log::debug("Rate limit hit! {}", m_rateLimitCounter);
+                m_rateLimitCounter = 0;
+                //TODO
+                
+            }
+        }).leak();
+
+        async::spawn([notify] -> arc::Future<> {
+            while (true) {
+                notify.notifyOne();
+                co_await arc::sleep(asp::Duration::fromMillis(1000));
+            }
+        });
+
+        async::spawn([notify] -> arc::Future<> {
+            while (true) {
+                co_await notify.notified();
+                if (m_rateLimitCounter > 0) {
+                    m_rateLimitCounter -= 1;
+                }
+            }
+        });
+
     }).leak();
-    RebindWindow().listen([](bool open) {
+    RebindWindow("rebind-window"_spr).listen([](bool open) {
         m_rebindWindowOpen = open;
     }).leak();    
 }
@@ -126,7 +160,7 @@ class $modify(FMODAudioEngine) {
 class $modify (MyCCKeyboardDispatcher, CCKeyboardDispatcher) {
     bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool repeat, double p3) {
         if (m_rebindWindowOpen) {
-            KeybindSender().send(key);
+            KeybindSender("keybind-sender"_spr).send(key);
         } else if (key == getOverlayKey()
             && down
             && !repeat

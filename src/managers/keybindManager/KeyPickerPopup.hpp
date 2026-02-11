@@ -3,11 +3,11 @@
 #include <Geode/ui/Popup.hpp>
 using namespace geode::prelude;
 
-struct RebindWindow : SimpleEvent<RebindWindow, bool> {
-    using SimpleEvent::SimpleEvent;
+struct RebindWindow : Event<RebindWindow, bool(bool), std::string> {
+    using Event::Event;
 };
-struct KeybindSender : SimpleEvent<KeybindSender, enumKeyCodes> {
-    using SimpleEvent::SimpleEvent;
+struct KeybindSender : Event<KeybindSender, bool(enumKeyCodes), std::string> {
+    using Event::Event;
 };
 
 // I stole this from custom keybinds lol
@@ -34,7 +34,7 @@ protected:
         if (!Popup::init(220.0f, 130.0f))
             return false;
         key = current;
-        RebindWindow().send(true);
+        RebindWindow("rebind-window"_spr).send(true);
         this->setTitle("Press a key!", "bigFont.fnt");
 
         keyLabel = CCLabelBMFont::create("Press Any Key", "goldFont.fnt");
@@ -42,13 +42,13 @@ protected:
 
         m_mainLayer->addChildAtPosition(keyLabel, Anchor::Center, {0, 8});
 
-        m_keyListener = KeybindSender().listen([this, onConfirm](enumKeyCodes pressedKey) {
+        m_keyListener = KeybindSender("keybind-sender"_spr).listen([this, onConfirm](enumKeyCodes pressedKey) {
             if (pressedKey == enumKeyCodes::KEY_Escape) pressedKey = enumKeyCodes::KEY_None;
             int k = int(pressedKey);
             if (k < 0) return;
             key = pressedKey;
             onConfirm(pressedKey);
-            RebindWindow().send(false);
+            RebindWindow("rebind-window"_spr).send(false);
             m_keyListener.destroy();
             if (k != 0) this->onClose(nullptr);
         });
