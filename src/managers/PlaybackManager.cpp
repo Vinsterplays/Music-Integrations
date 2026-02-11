@@ -12,7 +12,7 @@ bool PlaybackManager::isWindows() {
         if (!func) return false;
         return true;
     }();
-    return wine;
+    return !wine;
     log::debug("Running on Windows: {}", !wine);
     #else
     return false;
@@ -26,6 +26,7 @@ bool PlaybackManager::getMediaManager() {
         log::debug("Running on non-Windows system, skipping media manager initialization.");
         return false;
     }
+    #ifdef GEODE_IS_WINDOWS
 
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
@@ -121,11 +122,14 @@ bool PlaybackManager::getMediaManager() {
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
+    #endif
 }
 
+#ifdef GEODE_IS_WINDOWS
 void PlaybackManager::removeMediaManager() {
     m_mediaManager = nullptr;
 }
+#endif
 
 void PlaybackManager::isPlaybackActive(std::function<void(bool)> callback) {
     if (Mod::get()->getSavedValue<bool>("hasAuthorized") && !isWindows()) {
@@ -139,10 +143,14 @@ void PlaybackManager::isPlaybackActive(std::function<void(bool)> callback) {
             callback(isPlaying);
         });
     } else {
+        #ifdef GEODE_IS_WINDOWS
         auto session = m_mediaManager.GetCurrentSession();
         if (!session) callback(false);
         bool result = session.GetPlaybackInfo().PlaybackStatus() == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing ? true : false;
         callback(result);
+        #else
+        callback(false);
+        #endif
     }
 }
 
@@ -156,10 +164,12 @@ bool PlaybackManager::control(bool play) {
         PlaybackManager::get().spotifyControlRequest(Mod::get()->getSavedValue<std::string>("spotify-token", ""), 0, play);
         return true;
     } else {
+        #ifdef GEODE_IS_WINDOWS
         if (!m_mediaManager || m_immune) return false;
         auto session = m_mediaManager.GetCurrentSession();
         if (!session) return false;
         play ? session.TryPlayAsync() : session.TryPauseAsync();
+        #endif
         return true;
     }
 }
@@ -174,10 +184,12 @@ bool PlaybackManager::skip(bool direction) {
         PlaybackManager::get().spotifySkipRequest(Mod::get()->getSavedValue<std::string>("spotify-token", ""), 0, direction);
         return true;
      } else {
+        #ifdef GEODE_IS_WINDOWS
         if (!m_mediaManager) return false;
         auto session = m_mediaManager.GetCurrentSession();
         if (!session) return false;
         direction ? session.TrySkipNextAsync() : session.TrySkipPreviousAsync();
+        #endif
         return true;
      }
 }
@@ -194,13 +206,17 @@ bool PlaybackManager::toggleControl() {
         });
         return true;
     } else {
+        #ifdef GEODE_IS_WINDOWS
         if (!m_mediaManager) return false;
         auto session = m_mediaManager.GetCurrentSession();
         if (!session) return false;
         session.TryTogglePlayPauseAsync();
+        #endif
         return true;
     }
 }
+
+#ifdef GEODE_IS_WINDOWS
 
 std::optional<std::string> PlaybackManager::getCurrentSongTitle() {
     if (!isWindows()) return std::nullopt;
@@ -237,6 +253,8 @@ std::optional<std::string> PlaybackManager::getCurrentSongArtist() {
 
     return std::nullopt;
 }
+
+#endif
 
 void PlaybackManager::spotifyControlRequest(std::string token, int retryCount, bool play) {
     if (retryCount > 1) {

@@ -1,17 +1,21 @@
 #pragma once
 
 #include <Geode/Geode.hpp>
+#ifdef GEODE_IS_WINDOWS
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Media.Control.h>
 #include <winrt/Windows.Storage.Streams.h>
+#endif
 #include "Geode/loader/Event.hpp"
 
 #define WINRT_CPPWINRT
 
 using namespace geode::prelude;
+#ifdef GEODE_IS_WINDOWS
 using namespace winrt;
 using namespace Windows::Foundation;
 using namespace Windows::Media::Control;
+#endif
 
 class PlaybackManager {
 protected:
@@ -21,10 +25,14 @@ protected:
     void spotifyisPlaybackActive(std::string token, std::function<void(bool)> callback,int retryCount = 0);
     void spotifySkipRequest(std::string token, int retryCount = 0, bool direction = true);
 public:
+    #ifdef GEODE_IS_WINDOWS
     GlobalSystemMediaTransportControlsSessionManager m_mediaManager = nullptr;
+    #endif
     bool isWindows();
     bool getMediaManager();
+    #ifdef GEODE_IS_WINDOWS
     void removeMediaManager();
+    #endif
     bool control(bool play);
     bool skip(bool direction);
     bool toggleControl();

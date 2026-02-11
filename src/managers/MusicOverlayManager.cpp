@@ -54,7 +54,11 @@ protected:
 		m_bg->setOpacity(205);
 		this->addChildAtPosition(m_bg, Anchor::Center);
 
+        #ifdef GEODE_IS_WINDOWS
         if(pbm.m_mediaManager || Mod::get()->getSavedValue<bool>("hasAuthorized")) {
+        #else
+        if(Mod::get()->getSavedValue<bool>("hasAuthorized")) {
+        #endif
             m_musicTitle = Label::create("No Song", "font_default.fnt"_spr);
             m_musicTitle->addAllFonts();
             m_musicTitle->limitLabelWidth(250.f, 1.5, 0.1f);
@@ -238,7 +242,7 @@ protected:
             return ListenerResult::Propagate;
         });
 
-        if (!pbm.m_mediaManager) {
+        if (!pbm.isWindows()) {
             m_imageListener = PlaybackManager::SongUpdateEvent("image-update"_spr).listen([this](auto image) {
                 if (!image.empty()) this->updateImageFromUrl(image);
                 return ListenerResult::Propagate;
@@ -270,6 +274,7 @@ public:
 	}
 
 	void updateValues(bool show) {
+        #ifdef GEODE_IS_WINDOWS
         if (pbm.m_mediaManager) {
             auto title = pbm.getCurrentSongTitle();
             auto artist = pbm.getCurrentSongArtist();
@@ -292,7 +297,9 @@ public:
             });
 
 
-        } else if (Mod::get()->getSavedValue<bool>("hasAuthorized") && !pbm.isWindows()) {
+        }
+        #endif
+        if (Mod::get()->getSavedValue<bool>("hasAuthorized") && !pbm.isWindows()) {
             m_pollingToggle = show;
         }
         if (Mod::get()->getSavedValue<bool>("autoEnabled")) {

@@ -18,7 +18,11 @@
 #include "ui/linkSpotify.hpp"
 #include "managers/httpManager.hpp"
 
+#ifdef GEODE_IS_WINDOWS
+
 #include <Windows.h>
+
+#endif
 
 #define WINRT_CPPWINRT
 
@@ -125,6 +129,7 @@ $on_mod(Loaded) {
     }).leak();    
 }
 
+#ifdef GEODE_IS_WINDOWS
 class $modify(CCDirector) {
     void end() {
         CCDirector::end();
@@ -132,6 +137,7 @@ class $modify(CCDirector) {
         log::debug("Goodbye!");
     }
 };
+#endif
 
 
 //End goal is to stop relying on this
