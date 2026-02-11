@@ -50,4 +50,6 @@ setup_geode_mod(${PROJECT_NAME})
 
 if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows" OR WIN32)
   target_link_libraries(${PROJECT_NAME} windowsapp http_server)
+else()
+  target_link_libraries(${PROJECT_NAME} http_server)
 endif()
