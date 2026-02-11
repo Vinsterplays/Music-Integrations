@@ -48,4 +48,6 @@ add_subdirectory(src/server)
 
 setup_geode_mod(${PROJECT_NAME})
 
-target_link_libraries(${PROJECT_NAME} windowsapp http_server)
+if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows" OR WIN32)
+  target_link_libraries(${PROJECT_NAME} windowsapp http_server)
+endif()
