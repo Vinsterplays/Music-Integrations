@@ -12,7 +12,7 @@ bool PlaybackManager::isWindows() {
         if (!func) return false;
         return true;
     }();
-    return wine;
+    return !wine;
     log::debug("Running on Windows: {}", !wine);
     #else
     return false;
