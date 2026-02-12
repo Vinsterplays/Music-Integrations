@@ -181,7 +181,7 @@ bool PlaybackManager::skip(bool direction) {
             log::error("No Spotify token available");
             return false;
         }
-        PlaybackManager::get().spotifySkipRequest(Mod::get()->getSavedValue<std::string>("spotify-token", ""), 0, direction);
+        PlaybackManager::get().spotifySkipRequest(token, 0, direction);
         return true;
      } else {
         #ifdef GEODE_IS_WINDOWS
@@ -201,8 +201,8 @@ bool PlaybackManager::toggleControl() {
             log::error("No Spotify token available");
             return false;
         }
-        spotifyisPlaybackActive(token, [](bool isPlaying) {
-                PlaybackManager::get().spotifyControlRequest(Mod::get()->getSavedValue<std::string>("spotify-token", ""), 0, !isPlaying);
+        spotifyisPlaybackActive(token, [token](bool isPlaying) {
+                PlaybackManager::get().spotifyControlRequest(token, 0, !isPlaying);
         });
         return true;
     } else {
@@ -261,12 +261,14 @@ void PlaybackManager::spotifyControlRequest(std::string token, int retryCount, b
         log::error("Max retries reached for control request");
         return;
     }
+
+    if (Mod::get()->getSavedValue<bool>("isRateLimited")) return;
     
     auto req = web::WebRequest();
     req.header("Authorization", fmt::format("Bearer {}", token));
     req.header("Content-Length", "0");
     req.bodyString("");
-    
+
     m_listener.spawn(
         req.put(play ? "https://api.spotify.com/v1/me/player/play" : "https://api.spotify.com/v1/me/player/pause", geode::getMod()),
         [this, retryCount, play, token](web::WebResponse value) {
@@ -298,6 +300,8 @@ void PlaybackManager::spotifyisPlaybackActive(std::string token, std::function<v
         callback(false);
         return;
     }
+
+    if (Mod::get()->getSavedValue<bool>("isRateLimited")) return;
     
     auto req = web::WebRequest();
     req.header("Authorization", fmt::format("Bearer {}", token));
@@ -347,6 +351,8 @@ void PlaybackManager::spotifySkipRequest(std::string token, int retryCount, bool
         log::error("Max retries reached for control request");
         return;
     }
+
+    if (Mod::get()->getSavedValue<bool>("isRateLimited")) return;
     
     auto req = web::WebRequest();
     req.header("Authorization", fmt::format("Bearer {}", token));
@@ -382,6 +388,8 @@ void PlaybackManager::spotifyGetPlaybackInfo(std::string token, int retryCount) 
         log::error("Max retries reached for playback info request");
         return;
     }
+
+    if (Mod::get()->getSavedValue<bool>("isRateLimited")) return;
 
     web::WebRequest req;
     req.header("Authorization", fmt::format("Bearer {}", token));

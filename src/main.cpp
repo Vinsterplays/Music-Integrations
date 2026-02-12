@@ -48,7 +48,7 @@ $on_mod(Loaded) {
     GameEvent(geode::GameEventType::Loaded).listen([] {
         m_isLoaded = true;
         if (Mod::get()->getSavedValue<bool>("hasAuthorized") == false && PlaybackManager::get().isWindows() == false) {
-            createQuickPopup("Link Spotify", "Please link your Spotify account to use Music Integrations", "Link Now", "Close",
+            createQuickPopup("Link Spotify", "Please link your Spotify account to use Music Integrations <cc>(You will have 2 minutes to authenticate)</c>", "Link Now", "Close",
                 [](auto, bool btn2) {
                     if (btn2) return;
                     SpotifyAuth::get()->start([](std::string code) {
@@ -98,10 +98,15 @@ $on_mod(Loaded) {
         arc::Notify notify;
 
         PlaybackManager::RateLimitUpdate("rate-limit-update"_spr).listen([] {
+            log::debug("Rate limit update received");
+            if(Mod::get()->getSavedValue<bool>("isRateLimited")) {
+                log::debug("rate limited!");
+                return;
+            }
             m_rateLimitCounter += 1;
-            if (m_rateLimitCounter >= 7) {
+            if (m_rateLimitCounter >= 10) {
                 log::debug("Rate limit hit! {}", m_rateLimitCounter);
-                m_rateLimitCounter = 0;
+                Mod::get()->setSavedValue<bool>("isRateLimited", true);
                 CCSprite* warning = CCSprite::create("/foxy_1.png"_spr);
                 CCSize winSize = CCDirector::get()->getWinSize();
                 float scaleRatio = (winSize.height / warning->getContentSize().height);
@@ -148,6 +153,11 @@ $on_mod(Loaded) {
                 co_await notify.notified();
                 if (m_rateLimitCounter > 0) {
                     m_rateLimitCounter -= 1;
+                    log::debug("Rate limit counter: {}", m_rateLimitCounter);
+                }
+                if (Mod::get()->getSavedValue<bool>("isRateLimited") && m_rateLimitCounter == 0) {
+                    log::debug("No longer rate limited!");
+                    Mod::get()->setSavedValue("isRateLimited", false);
                 }
             }
         });

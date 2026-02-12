@@ -127,8 +127,8 @@ protected:
             m_menu->addChild(m_autoBtn);
             m_menu->setTouchPriority(-999);
             m_menu->updateLayout();
-            this->addChildAtPosition(m_menu, Anchor::Bottom, ccp(0, this->getContentHeight()/4));
-            this->addChildAtPosition(m_autoLabel, Anchor::Bottom, ccp(140, this->getContentHeight()/4));
+            this->addChildAtPosition(m_menu, Anchor::Bottom, ccp(10, this->getContentHeight()/4));
+            this->addChildAtPosition(m_autoLabel, Anchor::Bottom, ccp(150, this->getContentHeight()/4));
         } else {
             m_unavailableLabel = CCLabelBMFont::create("Media Controls Unavailable", "goldFont.fnt");
             this->addChildAtPosition(m_unavailableLabel, Anchor::Center);
