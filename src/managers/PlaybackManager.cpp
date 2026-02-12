@@ -12,7 +12,7 @@ bool PlaybackManager::isWindows() {
         if (!func) return false;
         return true;
     }();
-    return !wine;
+    return wine;
     log::debug("Running on Windows: {}", !wine);
     #else
     return false;
@@ -59,7 +59,7 @@ bool PlaybackManager::getMediaManager() {
                     auto status = s.GetPlaybackInfo().PlaybackStatus();
                     if (status == lastStatus) return;
                     lastStatus = status;
-                    PlaybackUpdateEvent("playback-update"_spr).send(status ==GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
+                    PlaybackUpdateEvent("playback-update"_spr).send(status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
                 });
             });
 
@@ -282,6 +282,7 @@ void PlaybackManager::spotifyControlRequest(std::string token, int retryCount, b
             } else if (value.code() == 404) {
                 log::debug("No active device");
             } else if (value.ok()) {
+                PlaybackUpdateEvent("playback-update"_spr).send(play);
                 log::debug("Successfully {} playback", play ? "started" : "paused");
             } else {
                 log::error("Request failed with code: {} {}", value.code(), value.string());
@@ -421,6 +422,10 @@ void PlaybackManager::spotifyGetPlaybackInfo(std::string token, int retryCount) 
                 root["currently_playing_type"].asString().unwrapOr("") != "track") {
                 log::debug("Nothing playable right now");
                 return;
+            }
+
+            if (root.contains("is_playing")) {
+                PlaybackUpdateEvent("playback-update"_spr).send(root["is_playing"].asBool().unwrapOr(false));
             }
 
             if (!root.contains("item")) {

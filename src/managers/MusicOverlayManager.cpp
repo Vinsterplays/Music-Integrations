@@ -31,6 +31,7 @@ protected:
     ListenerHandle m_playbackListener;
 
     arc::TaskHandle<void> m_pollingTask;
+    int m_pollingCooldown = 0;
     bool m_pollingToggle = false;
 
 
@@ -61,14 +62,14 @@ protected:
         #endif
             m_musicTitle = Label::create("No Song", "font_default.fnt"_spr);
             m_musicTitle->addAllFonts();
-            m_musicTitle->limitLabelWidth(250.f, 1.5, 0.1f);
+            m_musicTitle->limitLabelWidth(200.f, 1.5, 0.1f);
             m_musicTitle->setAnchorPoint({0.f, 0.5f});
             this->addChildAtPosition(m_musicTitle, Anchor::Top, ccp(-100, -25));
 
             m_musicArtist = Label::create("No Artist", "font_default.fnt"_spr);
             m_musicArtist->addAllFonts();
             m_musicArtist->setColor({253, 205, 52});
-            m_musicArtist->limitLabelWidth(250.f, 1.2, 0.1f); 
+            m_musicArtist->limitLabelWidth(200.f, 1.2, 0.1f); 
             m_musicArtist->setAnchorPoint({0.f, 0.5f});
             this->addChildAtPosition(m_musicArtist, Anchor::Top, ccp(-100, -55));
 
@@ -209,30 +210,6 @@ protected:
     void onEnter() override {
         CCLayer::onEnter();
         CCDirector::sharedDirector()->getTouchDispatcher()->addTargetedDelegate(this, -999, true);
-        if(Mod::get()->getSavedValue<bool>("hasAuthorized") && !pbm.isWindows()) {
-            std::string token = Mod::get()->getSavedValue<std::string>("spotify-token", "");
-            if (token.empty()) {
-                log::error("No Spotify token available");
-                return;
-            }
-            arc::Notify notify;
-
-            async::spawn([notify] -> arc::Future<> {
-                while (true) {
-                    notify.notifyOne();
-                    co_await arc::sleep(asp::Duration::fromSecs(3));
-                }
-            });
-
-            m_pollingTask = async::spawn([notify, token, this] -> arc::Future<> {
-                while (true) {
-                    co_await notify.notified();
-                    if (m_pollingToggle && Mod::get()->getSavedValue<bool>("hasAuthorized")) {
-                        PlaybackManager::get().spotifyGetPlaybackInfo(token, 0);
-                    }
-                }
-            });
-        }
         m_titleListener = PlaybackManager::SongUpdateEvent("title-update"_spr).listen([this](auto title) {
             if (!title.empty()) this->updateTitle(title);
             return ListenerResult::Propagate;
@@ -251,6 +228,36 @@ protected:
         m_playbackListener = PlaybackManager::PlaybackUpdateEvent("playback-update"_spr).listen([this](bool status) {
             togglePlaybackBtn(status);
         });
+        if(Mod::get()->getSavedValue<bool>("hasAuthorized") && !pbm.isWindows()) {
+            std::string token = Mod::get()->getSavedValue<std::string>("spotify-token", "");
+            if (token.empty()) {
+                log::error("No Spotify token available");
+                return;
+            }
+
+            PlaybackManager::get().spotifyGetPlaybackInfo(token, 0);
+
+            arc::Notify notify;
+
+            async::spawn([notify] -> arc::Future<> {
+                while (true) {
+                    notify.notifyOne();
+                    co_await arc::sleep(asp::Duration::fromSecs(1));
+                }
+            });
+
+            m_pollingTask = async::spawn([notify, token, this] -> arc::Future<> {
+                while (true) {
+                    co_await notify.notified();
+                    if (m_pollingCooldown > 0) m_pollingCooldown -= 1;
+                    
+                    if (m_pollingCooldown <= 0 && m_pollingToggle &&Mod::get()->getSavedValue<bool>("hasAuthorized")) {
+                        PlaybackManager::get().spotifyGetPlaybackInfo(token, 0);
+                        m_pollingCooldown = 4;
+                    }
+                }
+            });
+        }
     }
 
     void onExit() override {
@@ -280,14 +287,13 @@ public:
             auto artist = pbm.getCurrentSongArtist();
 
             m_musicTitle->setString(title.has_value() ? title->c_str() : "No Song");
-            m_musicTitle->limitLabelWidth(250.f, 1.5, 0.1f);
+            m_musicTitle->limitLabelWidth(200.f, 1.5, 0.1f);
 
             m_musicArtist->setString(artist.has_value() ? artist->c_str() : "No Artist");
-            m_musicArtist->limitLabelWidth(250.f, 1.2, 0.1f);
+            m_musicArtist->limitLabelWidth(200.f, 1.2, 0.1f);
             
             pbm.isPlaybackActive([this](bool isPlaying) {
                 auto status = isPlaying;
-                log::debug("Playback status: {}", status);
                 m_playbackBtn->setNormalImage(CCSprite::createWithSpriteFrameName(
                 status ? 
                     "GJ_pauseBtn_001.png" :
@@ -301,6 +307,16 @@ public:
         #endif
         if (Mod::get()->getSavedValue<bool>("hasAuthorized") && !pbm.isWindows()) {
             m_pollingToggle = show;
+            if (m_pollingCooldown == 0) {
+                std::string token = Mod::get()->getSavedValue<std::string>("spotify-token", "");
+                if (token.empty()) {
+                    log::error("No Spotify token available");
+                    return;
+                }
+
+                PlaybackManager::get().spotifyGetPlaybackInfo(token, 0);
+                m_pollingCooldown = 4;
+            }
         }
         if (Mod::get()->getSavedValue<bool>("autoEnabled")) {
             m_autoBtn->toggle(true);
@@ -312,14 +328,14 @@ public:
         if (!m_musicTitle) return;
 
         m_musicTitle->setString(title.length() != 0 ? title.c_str() : "No Song");
-        m_musicTitle->limitLabelWidth(250.f, 1.5, 0.1f);
+        m_musicTitle->limitLabelWidth(200.f, 1.5, 0.1f);
     }
 
     void updateArtist(std::string artist) {
         if (!m_musicArtist) return;
 
         m_musicArtist->setString(artist.length() != 0 ? artist.c_str() : "No Artist");
-        m_musicArtist->limitLabelWidth(250.f, 1.2, 0.1f);
+        m_musicArtist->limitLabelWidth(200.f, 1.2, 0.1f);
     }
 
     void updateImageFromUrl(std::string url) {
@@ -335,7 +351,6 @@ public:
     void togglePlaybackBtn(bool status) {
         if (!m_playbackBtn) return;
 
-        log::debug("toggling: {}", status);
         m_playbackBtn->setNormalImage(CCSprite::createWithSpriteFrameName(
             status ? 
                 "GJ_pauseBtn_001.png" :

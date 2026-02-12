@@ -10,6 +10,7 @@ protected:
     LocalAuthServer m_server;
     std::function<void(std::string)> m_callback;
     async::TaskHolder<web::WebResponse> m_listener;
+    arc::TaskHandle<void> m_timer;
     
 public:
     void start(std::function<void(std::string)> callback);

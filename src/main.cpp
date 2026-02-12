@@ -99,11 +99,40 @@ $on_mod(Loaded) {
 
         PlaybackManager::RateLimitUpdate("rate-limit-update"_spr).listen([] {
             m_rateLimitCounter += 1;
-            if (m_rateLimitCounter >= 10) {
+            if (m_rateLimitCounter >= 7) {
                 log::debug("Rate limit hit! {}", m_rateLimitCounter);
                 m_rateLimitCounter = 0;
-                //TODO
-                
+                CCSprite* warning = CCSprite::create("/foxy_1.png"_spr);
+                CCSize winSize = CCDirector::get()->getWinSize();
+                float scaleRatio = (winSize.height / warning->getContentSize().height);
+                warning->setScaleX(scaleRatio);
+                warning->setScaleY(scaleRatio);
+                CCScene::get()->addChildAtPosition(warning, Anchor::Center, {0, 0}, false);
+                CCArray* frames = CCArray::create();
+                for (int i = 1; i <= 14; i++) {
+                    auto filename = fmt::format("/foxy_{}.png"_spr, i);
+                    auto texture = CCTextureCache::sharedTextureCache()->addImage(filename.c_str(), false);
+                    if (texture) {
+                        auto frame = CCSpriteFrame::createWithTexture(texture, CCRectMake(0, 0, texture->getContentSize().width, texture->getContentSize().height));
+                        frames->addObject(frame);
+                    }
+                }
+
+                CCAnimation* anim = CCAnimation::createWithSpriteFrames(frames, 0.1f);
+                CCAnimate* animate = CCAnimate::create(anim);
+
+                warning->runAction(
+                    CCSequence::create(
+                        CallFuncExt::create([]() {
+                            FMODAudioEngine::sharedEngine()->playEffect("/fnafjumpscare.ogg"_spr);
+                        }),
+                        animate,
+                        CallFuncExt::create([warning]() {
+                            warning->removeFromParent();
+                        }),
+                        nullptr
+                    )
+                );
             }
         }).leak();
 

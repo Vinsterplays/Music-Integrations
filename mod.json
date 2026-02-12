@@ -17,7 +17,9 @@
 			"resources/*.txt",
 			"resources/BitmapFonts/*.fnt",
 			"resources/BitmapFonts/*.png",
-			"resources/*.png"
+			"resources/*.png",
+			"resources/foxy/*.png",
+			"resources/foxy/*.ogg"
 		]
 	},
 	"settings": {
@@ -25,7 +27,7 @@
 			"type": "custom:keybind",
 			"name": "Quick Overlay Keybind",
 			"description": "Press this key to show the quick options overlay",
-			"default": 33
+			"default": 164
 		}
 	}
 }

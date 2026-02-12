@@ -1,6 +1,7 @@
 #include "httpManager.hpp"
 #include <Geode/Geode.hpp>
 #include <Geode/utils/web.hpp>
+#include <arc/time/Sleep.hpp>
 
 using namespace geode::prelude;
 
@@ -9,11 +10,17 @@ SpotifyAuth* SpotifyAuth::instance = nullptr;
 void SpotifyAuth::start(std::function<void(std::string)> callback) {
     m_callback = callback;
     
+    m_timer = async::spawn(
+        arc::sleep(asp::Duration::fromSecs(120)),
+        [this] { this->stop(); }
+    );
+
     m_server.start([this](std::string code) {
         queueInMainThread([this, code] {
             Mod::get()->setSavedValue("spotify-code", code);
             
             this->stop();
+            m_timer.abort();
             
             if (m_callback) {
                 m_callback(code);
