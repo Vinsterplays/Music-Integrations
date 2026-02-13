@@ -172,13 +172,65 @@ protected:
 
 	void show(bool show) {
 		this->stopAllActions();
+        auto anchorStr = Mod::get()->getSettingValue<std::string>("overlay_anchor");
+
+        Anchor anchor = Anchor::BottomRight;
+        int offsetX = 5;
+        int offsetY = 10;
+        int slideLenth = 235;
+
+        if (anchorStr == "Top Left") {
+            anchor = Anchor::TopLeft;
+            offsetX = 5;
+            offsetY = -10;
+            this->setAnchorPoint({ 0, 1 });
+            slideLenth = -235;
+        }
+        else if (anchorStr == "Top Right") {
+            anchor = Anchor::TopRight;
+            offsetX = -5;
+            offsetY = -10;
+            this->setAnchorPoint({ 1, 1 });
+            slideLenth = 235;
+        }
+        else if (anchorStr == "Bottom Left") {
+            anchor = Anchor::BottomLeft;
+            offsetX = 5;
+            offsetY = 10;
+            this->setAnchorPoint({ 0, 0 });
+            slideLenth = -235;
+        }
+        else if (anchorStr == "Bottom Right") {
+            anchor = Anchor::BottomRight;
+            offsetX = -5;
+            offsetY = 10;
+            this->setAnchorPoint({ 1, 0 });
+            slideLenth = 235;
+        }
+        else if (anchorStr == "Middle Left") {
+            anchor = Anchor::Left;
+            offsetX = 5;
+            offsetY = 0;
+            this->setAnchorPoint({ 0, 0.5 });
+            slideLenth = -235;
+        }
+        else if (anchorStr == "Middle Right") {
+            anchor = Anchor::Right;
+            offsetX = -5;
+            offsetY = 0;
+            this->setAnchorPoint({ 1, 0.5 });
+            slideLenth = 235;
+        }
+
         if (show) {
             int highest = CCScene::get()->getHighestChildZ();
             this->setZOrder(highest + 1);
-             auto pos = AnchorLayout::getAnchoredPosition(CCScene::get(), Anchor::BottomRight, ccp(5, 10));
+            
+            this->setPosition(AnchorLayout::getAnchoredPosition(CCScene::get(), anchor, ccp(offsetX + slideLenth, offsetY)));
+             auto pos = AnchorLayout::getAnchoredPosition(CCScene::get(), anchor, ccp(offsetX, offsetY));
 		    this->runAction(CCEaseExponentialOut::create(CCMoveTo::create(0.75f, pos)));
         } else {
-            auto pos = AnchorLayout::getAnchoredPosition(CCScene::get(), Anchor::BottomRight, ccp(230, 10));
+            auto pos = AnchorLayout::getAnchoredPosition(CCScene::get(), anchor, ccp(offsetX + slideLenth, offsetY));
 		    this->runAction(CCEaseExponentialOut::create(CCMoveTo::create(0.75f, pos)));
         }
     }

@@ -35,7 +35,7 @@ enumKeyCodes getOverlayKey()   { return Mod::get()->getSettingValue<Keybind>("ke
 
 $on_mod(Loaded) {
     #ifdef GEODE_IS_WINDOWS
-    PlaybackManager::get().getMediaManager();
+    if(PlaybackManager::get().isWindows()) PlaybackManager::get().getMediaManager();
     #endif
 
     auto dummy = Label::create("", "font_default.fnt"_spr);
