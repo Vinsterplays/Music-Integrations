@@ -34,7 +34,9 @@ async::TaskHolder<web::WebResponse> m_listener;
 enumKeyCodes getOverlayKey()   { return Mod::get()->getSettingValue<Keybind>("key_overlay").getKey(); };
 
 $on_mod(Loaded) {
+    #ifdef GEODE_IS_WINDOWS
     PlaybackManager::get().getMediaManager();
+    #endif
 
     auto dummy = Label::create("", "font_default.fnt"_spr);
     dummy->addAllFonts();

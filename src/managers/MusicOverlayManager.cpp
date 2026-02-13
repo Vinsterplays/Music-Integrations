@@ -175,10 +175,10 @@ protected:
         if (show) {
             int highest = CCScene::get()->getHighestChildZ();
             this->setZOrder(highest + 1);
-             auto pos = AnchorLayout::getAnchoredPosition(this->getParent(), Anchor::BottomRight, ccp(5, 10));
+             auto pos = AnchorLayout::getAnchoredPosition(CCScene::get(), Anchor::BottomRight, ccp(5, 10));
 		    this->runAction(CCEaseExponentialOut::create(CCMoveTo::create(0.75f, pos)));
         } else {
-            auto pos = AnchorLayout::getAnchoredPosition(this->getParent(), Anchor::BottomRight, ccp(230, 10));
+            auto pos = AnchorLayout::getAnchoredPosition(CCScene::get(), Anchor::BottomRight, ccp(230, 10));
 		    this->runAction(CCEaseExponentialOut::create(CCMoveTo::create(0.75f, pos)));
         }
     }
@@ -271,12 +271,14 @@ protected:
 
 public:
 	static MusicControlOverlay* get() {
-		if (auto existing = CCScene::get()->getChildByType<MusicControlOverlay>(0)) {
+		if (auto existing = OverlayManager::get()->getChildByType<MusicControlOverlay>(0)) {
 			return existing;
 		}
 		auto create = MusicControlOverlay::create();
 		create->setID("overlay"_spr);
-		CCScene::get()->addChildAtPosition(create, Anchor::BottomRight, ccp(205, 10), false);
+        create->setPosition(AnchorLayout::getAnchoredPosition(CCScene::get(), Anchor::BottomRight, ccp(230, 10)));
+		//CCScene::get()->addChildAtPosition(create, Anchor::BottomRight, ccp(205, 10), false);
+        OverlayManager::get()->addChild(create);
 		return create;
 	}
 
@@ -343,6 +345,7 @@ public:
 
         this->removeChild(m_musicImage);
         m_musicImage = LazySprite::create({this->getContentSize().height*0.85f, this->getContentSize().height*0.85f}, true);
+        m_musicImage->setZOrder(1);
         this->addChildAtPosition(m_musicImage, Anchor::Left, ccp(10 + m_musicImage->getContentSize().width/2, 0));
         m_musicImage->setAutoResize(true);
         m_musicImage->loadFromUrl(url);

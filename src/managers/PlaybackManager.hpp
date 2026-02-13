@@ -27,12 +27,10 @@ protected:
 public:
     #ifdef GEODE_IS_WINDOWS
     GlobalSystemMediaTransportControlsSessionManager m_mediaManager = nullptr;
+    void removeMediaManager();
+    bool getMediaManager();
     #endif
     bool isWindows();
-    bool getMediaManager();
-    #ifdef GEODE_IS_WINDOWS
-    void removeMediaManager();
-    #endif
     bool control(bool play);
     bool skip(bool direction);
     bool toggleControl();

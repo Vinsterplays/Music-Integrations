@@ -28,6 +28,28 @@
 			"name": "Quick Overlay Keybind",
 			"description": "Press this key to show the quick options overlay",
 			"default": 164
+		},
+		"overlay_anchor": {
+			"type": "string",
+			"name": "Overlay Anchor",
+			"description": "The corner of the screen the overlay should be anchored to.",
+			"default": "Bottom Right",
+			"one-of": ["Top Left", "Top Right", "Bottom Left", "Bottom Right", "Middle Left", "Middle Right"]
+		},
+		"overlay_offset": {
+			"type": "int",
+			"name": "Overlay Offset",
+			"description": "The distance in pixels the overlay should be from the anchor point.",
+			"default": 0,
+			"min": -500,
+			"max": 500,
+			"control": {
+				"arrows": true,
+				"arrow-step": 10,
+				"slider": true,
+				"slider-step": 10,
+				"input": true
+			}
 		}
 	}
 }
