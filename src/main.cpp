@@ -99,6 +99,13 @@ $on_mod(Loaded) {
             );
         }
 
+        #ifdef GEODE_IS_WINDOWS
+        GameEvent(geode::GameEventType::Exiting).listen([] {
+            log::debug("Goodbye!");
+            PlaybackManager::get().removeMediaManager();
+        }).leak();
+        #endif
+
         arc::Notify notify;
 
         PlaybackManager::RateLimitUpdate("rate-limit-update"_spr).listen([] {
@@ -168,16 +175,6 @@ $on_mod(Loaded) {
 
     }).leak(); 
 }
-
-#ifdef GEODE_IS_WINDOWS
-class $modify(CCDirector) {
-    void end() {
-        CCDirector::end();
-        PlaybackManager::get().removeMediaManager();
-        log::debug("Goodbye!");
-    }
-};
-#endif
 
 
 //End goal is to stop relying on this
