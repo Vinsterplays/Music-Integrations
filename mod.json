@@ -1,5 +1,5 @@
 {
-	"geode": "5.0.0-alpha.2",
+	"geode": "5.0.0-beta.1",
 	"gd": {
 		"win": "2.2081",
 		"mac": "2.2081"
@@ -23,18 +23,18 @@
 		]
 	},
 	"settings": {
-		"key_overlay": {
-			"type": "custom:keybind",
-			"name": "Quick Overlay Keybind",
-			"description": "Press this key to show the quick options overlay",
-			"default": 164
-		},
 		"overlay_anchor": {
 			"type": "string",
 			"name": "Overlay Anchor",
 			"description": "The corner of the screen the overlay should be anchored to.",
 			"default": "Bottom Right",
 			"one-of": ["Top Left", "Top Right", "Bottom Left", "Bottom Right", "Middle Left", "Middle Right"]
+		},
+		"key_overlay": {
+			"type": "keybind",
+			"name": "Overlay Keybind",
+			"description": "The keybind to open the overlay.",
+			"default": "`"
 		}
 	}
 }

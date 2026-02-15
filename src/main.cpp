@@ -13,8 +13,6 @@
 
 #include "managers/MusicOverlayManager.cpp"
 #include "managers/PlaybackManager.hpp"
-#include "managers/keybindManager/KeyPickerPopup.hpp"
-#include "managers/keybindManager/keybindManager.hpp"
 #include "ui/linkSpotify.hpp"
 #include "managers/httpManager.hpp"
 
@@ -26,12 +24,9 @@
 
 #define WINRT_CPPWINRT
 
-bool m_isLoaded = false;
 bool m_rebindWindowOpen = false;
 int m_rateLimitCounter = 0;
 async::TaskHolder<web::WebResponse> m_listener;
-
-enumKeyCodes getOverlayKey()   { return Mod::get()->getSettingValue<Keybind>("key_overlay").getKey(); };
 
 $on_mod(Loaded) {
     #ifdef GEODE_IS_WINDOWS
@@ -47,8 +42,15 @@ $on_mod(Loaded) {
         });
     }
 
+    listenForKeybindSettingPresses("key_overlay", [](Keybind key, bool down, bool repeat) {
+        if ( key.key && down && !repeat) {
+            MusicControlOverlay::get()->updateValues(true);
+        } else if (key.key && !down) {
+            MusicControlOverlay::get()->updateValues(false);
+        }
+    });
+
     GameEvent(geode::GameEventType::Loaded).listen([] {
-        m_isLoaded = true;
         if (Mod::get()->getSavedValue<bool>("hasAuthorized") == false && PlaybackManager::get().isWindows() == false) {
             createQuickPopup("Link Spotify", "Please link your Spotify account to use Music Integrations <cc>(You will have 2 minutes to authenticate)</c>", "Link Now", "Close",
                 [](auto, bool btn2) {
@@ -164,10 +166,7 @@ $on_mod(Loaded) {
             }
         });
 
-    }).leak();
-    RebindWindow("rebind-window"_spr).listen([](bool open) {
-        m_rebindWindowOpen = open;
-    }).leak();    
+    }).leak(); 
 }
 
 #ifdef GEODE_IS_WINDOWS
@@ -201,34 +200,6 @@ class $modify(FMODAudioEngine) {
             lastMusicState = currentMusicState;
         }
 
-    }
-};
-
-class $modify (MyCCKeyboardDispatcher, CCKeyboardDispatcher) {
-    bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool repeat, double p3) {
-        if (m_rebindWindowOpen) {
-            KeybindSender("keybind-sender"_spr).send(key);
-        } else if (key == getOverlayKey()
-            && down
-            && !repeat
-            && m_isLoaded
-        ) {
-            MusicControlOverlay::get()->updateValues(true);
-        } else if (key == getOverlayKey()
-            && !down
-            && m_isLoaded
-        ) {
-            MusicControlOverlay::get()->updateValues(false);
-        } 
-        #ifdef DEBUG_BUILD
-        else if (key == enumKeyCodes::KEY_E && down) {
-            PlaybackManager& pbm = PlaybackManager::get();
-            log::debug("enabled: {}", Mod::get()->getSavedValue<bool>("autoEnabled"));
-            log::debug("active: {}", pbm.m_active);
-            log::debug("immune: {}", pbm.m_immune);
-        }
-        #endif
-        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, repeat, p3);
     }
 };
 
