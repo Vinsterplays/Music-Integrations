@@ -1,3 +1,9 @@
+# 2.0.0
+- Support for other platforms! (via Spotify API integration)
+- Added an option to customize the keybind used to display the overlay
+- Added an option to customize the location of the overlay
+- Album/track cover is now displayed in the overlay (as of now only on platforms that aren't Windows)
+
 # 1.5.3
 - Fixed an issue where the title and artist labels would scale outside the overlay
 

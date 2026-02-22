@@ -1,13 +1,16 @@
 # Music Integrations
 
-Automatically toggles the playback of music playing through external media players (<cr>Youtube</cr>, <cg>Spotify</cg>, etc.) when music is playing ingame. You can access the overlay to quickly toggle auto playback or control the media player.
+<cg>Music Integrations</c> allows you to easily control external music players from the game using an <cl>integrated overlay accessible from a configurable keybind</c>.
 
-<co>HOLD **ALT** TO ACCESS OVERLAY!</co>
+There is also an <cl>automatic playback toggle</c> option that will automatically <cl>toggle playback when playtesting</c> in the editor or entering a level.
 
-While support for other platforms is planned, currently this mod is <cr>only available on Windows</cr>, sorry!
+The windows version of the mod supports <cl>every*</c> external media player while other platforms (like MacOS and Linux via Wine) only support Spotify as of now (with other platforms planned).
 
 ## Special thanks to:
 - [Prevter](https://github.com/Prevter), for creating the label class used in the overlay
 - [Eclipse Menu](https://github.com/EclipseMenu/EclipseMenu), for providing all the fonts used in the overlay
 
 [If you wish to support my work, I have a Ko-fi](https://ko-fi.com/vinsterplays)
+
+
+\* Every external player supported by Windows media controls 
