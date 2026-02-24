@@ -137,7 +137,7 @@ void PlaybackManager::isPlaybackActive(std::function<void(bool)> callback) {
     } else {
         #ifdef GEODE_IS_WINDOWS
         auto session = m_mediaManager.GetCurrentSession();
-        if (!session) callback(false);
+        if (!session) return callback(false);
         bool result = session.GetPlaybackInfo().PlaybackStatus() == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing ? true : false;
         callback(result);
         #else
