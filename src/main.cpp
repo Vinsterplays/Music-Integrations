@@ -43,10 +43,11 @@ $on_mod(Loaded) {
     }
 
     listenForKeybindSettingPresses("key_overlay", [](Keybind key, bool down, bool repeat, double time) {
-        if ( key.key && down && !repeat) {
-            MusicControlOverlay::get()->updateValues(true);
-        } else if (key.key && !down) {
-            MusicControlOverlay::get()->updateValues(false);
+        auto overlay = MusicControlOverlay::get();
+        if ( key.key && down && !repeat && overlay) {
+            overlay->updateValues(true);
+        } else if (key.key && !down && overlay) {
+            overlay->updateValues(false);
         }
     });
 
