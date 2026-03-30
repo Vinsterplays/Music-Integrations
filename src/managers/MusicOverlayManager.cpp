@@ -276,6 +276,14 @@ protected:
                 if (!image.empty()) this->updateImageFromUrl(image);
                 return ListenerResult::Propagate;
             });
+        } else {
+            m_imageListener = PlaybackManager::ThumbnailUpdateEvent("image-update"_spr).listen([this](auto image) {
+                if (!image.empty()) this->updateImageFromData(image);
+                return ListenerResult::Propagate;
+            });
+            pbm.getCurrentSongThumbnail([this](std::vector<uint8_t> data) {
+                this->updateImageFromData(data);
+            });
         }
         m_playbackListener = PlaybackManager::PlaybackUpdateEvent("playback-update"_spr).listen([this](bool status) {
             togglePlaybackBtn(status);
@@ -401,6 +409,19 @@ public:
         this->addChildAtPosition(m_musicImage, Anchor::Left, ccp(10 + m_musicImage->getContentSize().width/2, 0));
         m_musicImage->setAutoResize(true);
         m_musicImage->loadFromUrl(url);
+    }
+
+    void updateImageFromData(std::vector<uint8_t> data) {
+        this->removeChild(m_musicImage);
+        m_musicImage = LazySprite::create({this->getContentSize().height*0.85f, this->getContentSize().height*0.85f}, true);
+        m_musicImage->setZOrder(1);
+        this->addChildAtPosition(m_musicImage, Anchor::Left, ccp(10 + m_musicImage->getContentSize().width/2, 0));
+        m_musicImage->setAutoResize(true);
+        if (data.empty()) {
+            m_musicImage->loadFromFile(fmt::format("{}/default.png", Mod::get()->getID()).c_str());
+        } else {
+            m_musicImage->loadFromData(data);
+        }
     }
 
     void togglePlaybackBtn(bool status) {

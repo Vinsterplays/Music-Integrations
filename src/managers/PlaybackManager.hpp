@@ -37,12 +37,16 @@ public:
     void isPlaybackActive(std::function<void(bool)> callback);
     std::optional<std::string> getCurrentSongTitle();
     std::optional<std::string> getCurrentSongArtist();
+    void getCurrentSongThumbnail(std::function<void(std::vector<uint8_t>)> callback);
     void spotifyGetPlaybackInfo(std::string token, int retryCount = 0);
 
     bool m_immune = false;
     bool m_active = false;
 
     struct SongUpdateEvent : Event<SongUpdateEvent, bool(std::string), std::string> {
+        using Event::Event;
+    };
+    struct ThumbnailUpdateEvent : Event<ThumbnailUpdateEvent, bool(std::vector<uint8_t>), std::string> {
         using Event::Event;
     };
     struct PlaybackUpdateEvent : ThreadSafeEvent<PlaybackUpdateEvent, bool(bool status), std::string> {

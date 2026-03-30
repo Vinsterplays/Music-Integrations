@@ -31,6 +31,11 @@ async::TaskHolder<web::WebResponse> m_listener;
 $on_mod(Loaded) {
     #ifdef GEODE_IS_WINDOWS
     if(PlaybackManager::get().isWindows()) PlaybackManager::get().getMediaManager();
+
+    GameEvent(geode::GameEventType::Exiting).listen([] {
+        log::debug("Goodbye!");
+        PlaybackManager::get().removeMediaManager();
+    }).leak();
     #endif
 
     auto dummy = Label::create("", "font_default.fnt"_spr);
@@ -100,17 +105,9 @@ $on_mod(Loaded) {
             );
         }
 
-        #ifdef GEODE_IS_WINDOWS
-        GameEvent(geode::GameEventType::Exiting).listen([] {
-            log::debug("Goodbye!");
-            PlaybackManager::get().removeMediaManager();
-        }).leak();
-        #endif
-
         arc::Notify notify;
 
         PlaybackManager::RateLimitUpdate("rate-limit-update"_spr).listen([] {
-            log::debug("Rate limit update received");
             if(Mod::get()->getSavedValue<bool>("isRateLimited")) {
                 log::debug("rate limited!");
                 return;
@@ -165,7 +162,6 @@ $on_mod(Loaded) {
                 co_await notify.notified();
                 if (m_rateLimitCounter > 0) {
                     m_rateLimitCounter -= 1;
-                    log::debug("Rate limit counter: {}", m_rateLimitCounter);
                 }
                 if (Mod::get()->getSavedValue<bool>("isRateLimited") && m_rateLimitCounter == 0) {
                     log::debug("No longer rate limited!");

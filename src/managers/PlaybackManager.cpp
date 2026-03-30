@@ -36,17 +36,43 @@ bool PlaybackManager::getMediaManager() {
         if (auto session = m_mediaManager.GetCurrentSession()) {
             static std::string lastSongName, lastArtistName;
             static GlobalSystemMediaTransportControlsSessionPlaybackStatus lastStatus{};
+
             session.MediaPropertiesChanged([this](auto session, auto) {
                 auto op = session.TryGetMediaPropertiesAsync();
                 op.Completed([this, session](auto const& async2, auto) {
                     if (async2.Status() != AsyncStatus::Completed) return;
 
-                    Loader::get()->queueInMainThread([this, session, async2] {
-                        auto props = async2.GetResults();
-                        auto title  = winrt::to_string(props.Title());
-                        auto artist = winrt::to_string(props.Artist());
+                    auto props = async2.GetResults();
+                    auto title  = winrt::to_string(props.Title());
+                    auto artist = winrt::to_string(props.Artist());
+                    auto thumbnail = props.Thumbnail();
+
+                    Loader::get()->queueInMainThread([this, title, artist] {
                         if (title  != lastSongName)  { lastSongName  = title;  SongUpdateEvent("title-update"_spr).send(title); }
                         if (artist != lastArtistName) { lastArtistName = artist; SongUpdateEvent("artist-update"_spr).send(artist); }
+                    });
+
+                    if (!thumbnail) return;
+                    auto streamOp = thumbnail.OpenReadAsync();
+                    streamOp.Completed([](auto const& streamAsync, auto) {
+                        if (streamAsync.Status() != AsyncStatus::Completed) return;
+
+                        auto stream = streamAsync.GetResults();
+                        uint32_t size = static_cast<uint32_t>(stream.Size());
+                        if (size == 0) return;
+
+                        winrt::Windows::Storage::Streams::DataReader reader(stream);
+                        auto loadOp = reader.LoadAsync(size);
+                        loadOp.Completed([reader, size](auto const& loadAsync, auto) mutable {
+                            if (loadAsync.Status() != AsyncStatus::Completed) return;
+
+                            std::vector<uint8_t> bytes(size);
+                            reader.ReadBytes(bytes);
+
+                            Loader::get()->queueInMainThread([bytes = std::move(bytes)] {
+                                ThumbnailUpdateEvent("image-update"_spr).send(bytes);
+                            });
+                        });
                     });
                 });
             });
@@ -61,18 +87,45 @@ bool PlaybackManager::getMediaManager() {
                 });
             });
 
+            // Initial fetch
             auto op = session.TryGetMediaPropertiesAsync();
-                op.Completed([this, session](auto const& async2, auto) {
-                    if (async2.Status() != AsyncStatus::Completed) return;
+            op.Completed([this, session](auto const& async2, auto) {
+                if (async2.Status() != AsyncStatus::Completed) return;
 
-                    Loader::get()->queueInMainThread([this, session, async2] {
-                        auto props = async2.GetResults();
-                        auto title  = winrt::to_string(props.Title());
-                        auto artist = winrt::to_string(props.Artist());
-                        if (title  != lastSongName)  { lastSongName  = title;  SongUpdateEvent("title-update"_spr).send(title); }
-                        if (artist != lastArtistName) { lastArtistName = artist; SongUpdateEvent("artist-update"_spr).send(artist); }
+                auto props = async2.GetResults();
+                auto title  = winrt::to_string(props.Title());
+                auto artist = winrt::to_string(props.Artist());
+                auto thumbnail = props.Thumbnail();
+
+                Loader::get()->queueInMainThread([this, title, artist] {
+                    if (title  != lastSongName)  { lastSongName  = title;  SongUpdateEvent("title-update"_spr).send(title); }
+                    if (artist != lastArtistName) { lastArtistName = artist; SongUpdateEvent("artist-update"_spr).send(artist); }
+                });
+
+                if (!thumbnail) return;
+                auto streamOp = thumbnail.OpenReadAsync();
+                streamOp.Completed([](auto const& streamAsync, auto) {
+                    if (streamAsync.Status() != AsyncStatus::Completed) return;
+
+                    auto stream = streamAsync.GetResults();
+                    uint32_t size = static_cast<uint32_t>(stream.Size());
+                    if (size == 0) return;
+
+                    winrt::Windows::Storage::Streams::DataReader reader(stream);
+                    auto loadOp = reader.LoadAsync(size);
+                    loadOp.Completed([reader, size](auto const& loadAsync, auto) mutable {
+                        if (loadAsync.Status() != AsyncStatus::Completed) return;
+
+                        std::vector<uint8_t> bytes(size);
+                        reader.ReadBytes(bytes);
+
+                        Loader::get()->queueInMainThread([bytes = std::move(bytes)] {
+                            ThumbnailUpdateEvent("image-update"_spr).send(bytes);
+                        });
                     });
                 });
+            });
+
             Loader::get()->queueInMainThread([this, session] {
                 auto status = session.GetPlaybackInfo().PlaybackStatus();
                 if (status == lastStatus) return;
@@ -93,11 +146,9 @@ bool PlaybackManager::getMediaManager() {
                         attachToSession();
                     }
                 );
-
                 attachToSession();
-                
                 return true;
-            } catch (const winrt::hresult_error & e) {
+            } catch (const winrt::hresult_error& e) {
                 log::debug("Failed to get media session: {}", winrt::to_string(e.message()));
                 return false;
             } catch (...) {
@@ -106,7 +157,7 @@ bool PlaybackManager::getMediaManager() {
             }
             break;
         }
-        
+
         if (status == AsyncStatus::Error || status == AsyncStatus::Canceled) {
             log::debug("Failed to retrieve media manager.");
             return false;
@@ -238,6 +289,46 @@ std::optional<std::string> PlaybackManager::getCurrentSongArtist() {
     }
 
     return std::nullopt;
+}
+
+void PlaybackManager::getCurrentSongThumbnail(std::function<void(std::vector<uint8_t>)> callback) {
+    try {
+        auto currentSession = m_mediaManager.GetCurrentSession();
+        if (!currentSession) return;
+
+        auto propAsync = currentSession.TryGetMediaPropertiesAsync();
+        propAsync.Completed([callback](auto const& async, auto) {
+            if (async.Status() != AsyncStatus::Completed) { Loader::get()->queueInMainThread([callback] { callback({}); }); return; };
+
+            auto props = async.GetResults();
+            auto thumbnail = props.Thumbnail();
+            if (!thumbnail) { Loader::get()->queueInMainThread([callback] { callback({}); }); return; };
+
+            auto streamOp = thumbnail.OpenReadAsync();
+            streamOp.Completed([callback](auto const& streamAsync, auto) {
+                if (streamAsync.Status() != AsyncStatus::Completed) { Loader::get()->queueInMainThread([callback] { callback({}); }); return; };
+
+                auto stream = streamAsync.GetResults();
+                uint32_t size = static_cast<uint32_t>(stream.Size());
+                if (size == 0) { Loader::get()->queueInMainThread([callback] { callback({}); }); return; }
+
+                winrt::Windows::Storage::Streams::DataReader reader(stream);
+                auto loadOp = reader.LoadAsync(size);
+                loadOp.Completed([reader, size, callback](auto const& loadAsync, auto) mutable {
+                    if (loadAsync.Status() != AsyncStatus::Completed) { Loader::get()->queueInMainThread([callback] { callback({}); }); return; }
+
+                    std::vector<uint8_t> bytes(size);
+                    reader.ReadBytes(bytes);
+
+                    Loader::get()->queueInMainThread([bytes = std::move(bytes), callback] {
+                        callback(bytes);
+                    });
+                });
+            });
+        });
+    } catch (const winrt::hresult_error& e) {
+        log::debug("Failed to get song thumbnail: {}", winrt::to_string(e.message()));
+    }
 }
 #endif
 
@@ -474,9 +565,14 @@ void PlaybackManager::spotifyGetPlaybackInfo(std::string token, int retryCount) 
                 return;
             }
             
-            SongUpdateEvent("title-update"_spr).send(titleOpt.unwrap());
-            SongUpdateEvent("artist-update"_spr).send(artistOpt.unwrap());
-            SongUpdateEvent("image-update"_spr).send(coverOpt.unwrap());
+            auto title = titleOpt.unwrap();
+            auto artist = artistOpt.unwrap();
+            auto thumbnail = coverOpt.unwrap();
+            Loader::get()->queueInMainThread([title, artist, thumbnail] {
+                SongUpdateEvent("title-update"_spr).send(title);
+                SongUpdateEvent("artist-update"_spr).send(artist);
+                SongUpdateEvent("image-update"_spr).send(thumbnail);
+            });
         }
     );
 }
