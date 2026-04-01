@@ -1,6 +1,6 @@
-# Music Integrations
+# Soggy Integrations
 
-<cg>Music Integrations</c> allows you to easily control external music players from the game using an <cl>integrated overlay accessible from a configurable keybind</c>.
+<cg>Soggy Integrations</c> allows you to easily control external music players from the game using an <cl>integrated overlay accessible from a configurable keybind</c>.
 
 There is also an <cl>automatic playback toggle</c> option that will automatically <cl>toggle playback when playtesting</c> in the editor or entering a level.
 

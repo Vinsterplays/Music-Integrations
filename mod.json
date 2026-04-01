@@ -5,8 +5,8 @@
 		"mac": "2.2081"
 	},
 	"id": "vinsterplays.music_integrations",
-	"name": "Music Integrations",
-	"version": "v2.0.0-beta.6",
+	"name": "Soggy Integrations",
+	"version": "v2.0.0-beta.67",
 	"developer": "Vinsterplays",
 	"description": "Control YT/Spotify without tabbing out.",
 	"repository": "https://github.com/Vinsterplays/Music-Integrations",
