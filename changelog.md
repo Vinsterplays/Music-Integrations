@@ -1,12 +1,8 @@
-# 2.0.0-beta.67
-- Added support for album cover on windows (kinda)
-- Added Soggy Mod
-
 # 2.0.0
 - Support for other platforms! (via Spotify API integration)
 - Added an option to customize the keybind used to display the overlay
 - Added an option to customize the location of the overlay
-- Album/track cover is now displayed in the overlay (only on non-windows versions)
+- Album/track cover is now displayed in the overlay
 
 # 1.5.3
 - Fixed an issue where the title and artist labels would scale outside the overlay

@@ -271,7 +271,6 @@ protected:
             return ListenerResult::Propagate;
         });
 
-        /* Disabled for Soggy Integrations
         if (!pbm.isWindows()) {
             m_imageListener = PlaybackManager::SongUpdateEvent("image-update"_spr).listen([this](auto image) {
                 if (!image.empty()) this->updateImageFromUrl(image);
@@ -285,7 +284,7 @@ protected:
             pbm.getCurrentSongThumbnail([this](std::vector<uint8_t> data) {
                 this->updateImageFromData(data);
             });
-        }*/
+        }
         m_playbackListener = PlaybackManager::PlaybackUpdateEvent("playback-update"_spr).listen([this](bool status) {
             togglePlaybackBtn(status);
         });

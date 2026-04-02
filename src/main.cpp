@@ -58,7 +58,7 @@ $on_mod(Loaded) {
 
     GameEvent(geode::GameEventType::Loaded).listen([] {
         if (Mod::get()->getSavedValue<bool>("hasAuthorized") == false && PlaybackManager::get().isWindows() == false) {
-            createQuickPopup("Link Spotify", "Please link your Spotify account to use Soggy Integrations <cc>(You will have 2 minutes to authenticate)</c>", "Link Now", "Close",
+            createQuickPopup("Link Spotify", "Please link your Spotify account to use Music Integrations <cc>(You will have 2 minutes to authenticate)</c>", "Link Now", "Close",
                 [](auto, bool btn2) {
                     if (btn2) return;
                     SpotifyAuth::get()->start([](std::string code) {
