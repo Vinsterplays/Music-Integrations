@@ -263,25 +263,30 @@ protected:
         CCLayer::onEnter();
         CCDirector::sharedDirector()->getTouchDispatcher()->addTargetedDelegate(this, -999, true);
         m_titleListener = PlaybackManager::SongUpdateEvent("title-update"_spr).listen([this](auto title) {
+            if (!this->getParent()) return ListenerResult::Propagate;
             if (!title.empty()) this->updateTitle(title);
             return ListenerResult::Propagate;
         });
         m_artistListener = PlaybackManager::SongUpdateEvent("artist-update"_spr).listen([this](auto artist) {
+            if (!this->getParent()) return ListenerResult::Propagate;
             if (!artist.empty()) this->updateArtist(artist);
             return ListenerResult::Propagate;
         });
 
         if (!pbm.isWindows()) {
             m_imageListener = PlaybackManager::SongUpdateEvent("image-update"_spr).listen([this](auto image) {
+                if (!this->getParent()) return ListenerResult::Propagate;
                 if (!image.empty()) this->updateImageFromUrl(image);
                 return ListenerResult::Propagate;
             });
         } else {
             m_imageListener = PlaybackManager::ThumbnailUpdateEvent("image-update"_spr).listen([this](auto image) {
+                if (!this->getParent()) return ListenerResult::Propagate;
                 if (!image.empty()) this->updateImageFromData(image);
                 return ListenerResult::Propagate;
             });
             pbm.getCurrentSongThumbnail([this](std::vector<uint8_t> data) {
+                if (!this->getParent()) return;
                 this->updateImageFromData(data);
             });
         }
@@ -325,12 +330,15 @@ protected:
         m_titleListener.destroy();
         m_artistListener.destroy();
         m_playbackListener.destroy();
+        m_imageListener.destroy();
         if (m_pollingTask.isValid()) m_pollingTask.abort();
         CCLayer::onExit();
     }
 
 public:
 	static MusicControlOverlay* get() {
+        auto om = OverlayManager::get();
+        if (!om) return nullptr;
 		if (auto existing = OverlayManager::get()->getChildByType<MusicControlOverlay>(0)) {
 			return existing;
 		}
@@ -343,6 +351,7 @@ public:
 	}
 
 	void updateValues(bool show) {
+        if (!m_musicTitle || !m_musicArtist) return;
         #ifdef GEODE_IS_WINDOWS
         if (pbm.m_mediaManager) {
             auto title = pbm.getCurrentSongTitle();
