@@ -1,14 +1,32 @@
 #include "Geode/loader/Event.hpp"
 #include "Geode/loader/Log.hpp"
 #include "PlaybackManager.hpp"
-#include "AdvancedLabelManager.hpp"
 #include <Geode/Geode.hpp>
 #include <Geode/loader/Dispatch.hpp>
 #include <Geode/ui/GeodeUI.hpp>
+#include <Geode/ui/Label.hpp>
 #include <Geode/Utils.hpp>
 #include <arc/time/Sleep.hpp>
 
+#include <array>
+
 using namespace geode::prelude;
+
+static constexpr std::array FALLBACK_FONTS = {
+    "font_cyrillic.fnt"_spr,
+    "font_greek.fnt"_spr,
+    "font_japanese.fnt"_spr,
+    "font_thai.fnt"_spr,
+    "font_vietnamese.fnt"_spr,
+};
+
+static Label* createMusicLabel(std::string text) {
+    auto label = Label::create(std::move(text), "font_default.fnt"_spr);
+    for (auto font : FALLBACK_FONTS) {
+        label->registerFont(font);
+    }
+    return label;
+}
 
 class MusicControlOverlay : public CCLayer {
 protected:
@@ -60,16 +78,14 @@ protected:
         #else
         if(Mod::get()->getSavedValue<bool>("hasAuthorized")) {
         #endif
-            m_musicTitle = Label::create("No Song", "font_default.fnt"_spr);
-            m_musicTitle->addAllFonts();
-            m_musicTitle->limitLabelWidth(200.f, 1.5, 0.1f);
+            m_musicTitle = createMusicLabel("No Song");
+            m_musicTitle->setLimitLabelWidth(300.f, 1.5f, 0.1f);
             m_musicTitle->setAnchorPoint({0.f, 0.5f});
             this->addChildAtPosition(m_musicTitle, Anchor::Top, ccp(-100, -25));
 
-            m_musicArtist = Label::create("No Artist", "font_default.fnt"_spr);
-            m_musicArtist->addAllFonts();
+            m_musicArtist = createMusicLabel("No Artist");
             m_musicArtist->setColor({253, 205, 52});
-            m_musicArtist->limitLabelWidth(200.f, 1.2, 0.1f); 
+            m_musicArtist->setLimitLabelWidth(300.f, 1.2f, 0.1f);
             m_musicArtist->setAnchorPoint({0.f, 0.5f});
             this->addChildAtPosition(m_musicArtist, Anchor::Top, ccp(-100, -55));
 
@@ -357,11 +373,9 @@ public:
             auto title = pbm.getCurrentSongTitle();
             auto artist = pbm.getCurrentSongArtist();
 
-            m_musicTitle->setString(title.has_value() ? title->c_str() : "No Song");
-            m_musicTitle->limitLabelWidth(200.f, 1.5, 0.1f);
+            m_musicTitle->setText(title.has_value() ? *title : "No Song");
 
-            m_musicArtist->setString(artist.has_value() ? artist->c_str() : "No Artist");
-            m_musicArtist->limitLabelWidth(200.f, 1.2, 0.1f);
+            m_musicArtist->setText(artist.has_value() ? *artist : "No Artist");
             
             pbm.isPlaybackActive([this](bool isPlaying) {
                 auto status = isPlaying;
@@ -398,15 +412,13 @@ public:
     void updateTitle(std::string title) {
         if (!m_musicTitle) return;
 
-        m_musicTitle->setString(title.length() != 0 ? title.c_str() : "No Song");
-        m_musicTitle->limitLabelWidth(200.f, 1.5, 0.1f);
+        m_musicTitle->setText(title.length() != 0 ? title : "No Song");
     }
 
     void updateArtist(std::string artist) {
         if (!m_musicArtist) return;
 
-        m_musicArtist->setString(artist.length() != 0 ? artist.c_str() : "No Artist");
-        m_musicArtist->limitLabelWidth(200.f, 1.2, 0.1f);
+        m_musicArtist->setText(artist.length() != 0 ? artist : "No Artist");
     }
 
     void updateImageFromUrl(std::string url) {

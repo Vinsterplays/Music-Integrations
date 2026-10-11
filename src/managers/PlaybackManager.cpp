@@ -20,6 +20,18 @@ bool PlaybackManager::isWindows() {
 }
 
 #ifdef GEODE_IS_WINDOWS
+static std::optional<GlobalSystemMediaTransportControlsSessionPlaybackStatus> getPlaybackStatus(GlobalSystemMediaTransportControlsSession const& session) {
+    if (!session) return std::nullopt;
+    try {
+        auto info = session.GetPlaybackInfo();
+        if (!info) return std::nullopt;
+        return info.PlaybackStatus();
+    } catch (const winrt::hresult_error& e) {
+        log::debug("Failed to get playback info: {}", winrt::to_string(e.message()));
+    }
+    return std::nullopt;
+}
+
 bool PlaybackManager::getMediaManager() {
     if (!isWindows()) {
         log::debug("Running on non-Windows system, skipping media manager initialization.");
@@ -43,6 +55,7 @@ bool PlaybackManager::getMediaManager() {
                     if (async2.Status() != AsyncStatus::Completed) return;
 
                     auto props = async2.GetResults();
+                    if (!props) return;
                     auto title  = winrt::to_string(props.Title());
                     auto artist = winrt::to_string(props.Artist());
                     auto thumbnail = props.Thumbnail();
@@ -78,9 +91,11 @@ bool PlaybackManager::getMediaManager() {
             });
 
             session.PlaybackInfoChanged([this](auto s, auto) {
-                if (!s || s != m_mediaManager.GetCurrentSession()) return;
+                if (!s || !m_mediaManager || s != m_mediaManager.GetCurrentSession()) return;
                 Loader::get()->queueInMainThread([this, s] {
-                    auto status = s.GetPlaybackInfo().PlaybackStatus();
+                    auto playbackStatus = getPlaybackStatus(s);
+                    if (!playbackStatus) return;
+                    auto status = *playbackStatus;
                     if (status == lastStatus) return;
                     lastStatus = status;
                     PlaybackUpdateEvent("playback-update"_spr).send(status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
@@ -93,6 +108,7 @@ bool PlaybackManager::getMediaManager() {
                 if (async2.Status() != AsyncStatus::Completed) return;
 
                 auto props = async2.GetResults();
+                if (!props) return;
                 auto title  = winrt::to_string(props.Title());
                 auto artist = winrt::to_string(props.Artist());
                 auto thumbnail = props.Thumbnail();
@@ -127,7 +143,9 @@ bool PlaybackManager::getMediaManager() {
             });
 
             Loader::get()->queueInMainThread([this, session] {
-                auto status = session.GetPlaybackInfo().PlaybackStatus();
+                auto playbackStatus = getPlaybackStatus(session);
+                if (!playbackStatus) return;
+                auto status = *playbackStatus;
                 if (status == lastStatus) return;
                 lastStatus = status;
                 PlaybackUpdateEvent("playback-update"_spr).send(status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
@@ -187,10 +205,9 @@ void PlaybackManager::isPlaybackActive(std::function<void(bool)> callback) {
         spotifyisPlaybackActive(token, [callback](bool isPlaying) { callback(isPlaying); });
     } else {
         #ifdef GEODE_IS_WINDOWS
-        auto session = m_mediaManager.GetCurrentSession();
-        if (!session) return callback(false);
-        bool result = session.GetPlaybackInfo().PlaybackStatus() == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing ? true : false;
-        callback(result);
+        if (!m_mediaManager) return callback(false);
+        auto status = getPlaybackStatus(m_mediaManager.GetCurrentSession());
+        callback(status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
         #else
         callback(false);
         #endif
@@ -260,12 +277,14 @@ bool PlaybackManager::toggleControl() {
 
 #ifdef GEODE_IS_WINDOWS
 std::optional<std::string> PlaybackManager::getCurrentSongTitle() {
+    if (!m_mediaManager) return std::nullopt;
     try {
         auto currentSession = m_mediaManager.GetCurrentSession();
         if (!currentSession) return std::nullopt;
 
         auto propAsync = currentSession.TryGetMediaPropertiesAsync();
         auto props = propAsync.get(); // blocks until ready
+        if (!props) return std::nullopt;
 
         return winrt::to_string(props.Title());
     } catch (const winrt::hresult_error& e) {
@@ -276,12 +295,14 @@ std::optional<std::string> PlaybackManager::getCurrentSongTitle() {
 }
 
 std::optional<std::string> PlaybackManager::getCurrentSongArtist() {
+    if (!m_mediaManager) return std::nullopt;
     try {
         auto currentSession = m_mediaManager.GetCurrentSession();
         if (!currentSession) return std::nullopt;
 
         auto propAsync = currentSession.TryGetMediaPropertiesAsync();
         auto props = propAsync.get(); // blocks until ready
+        if (!props) return std::nullopt;
 
         return winrt::to_string(props.Artist());
     } catch (const winrt::hresult_error& e) {
@@ -292,6 +313,7 @@ std::optional<std::string> PlaybackManager::getCurrentSongArtist() {
 }
 
 void PlaybackManager::getCurrentSongThumbnail(std::function<void(std::vector<uint8_t>)> callback) {
+    if (!m_mediaManager) return;
     try {
         auto currentSession = m_mediaManager.GetCurrentSession();
         if (!currentSession) return;
@@ -301,7 +323,7 @@ void PlaybackManager::getCurrentSongThumbnail(std::function<void(std::vector<uin
             if (async.Status() != AsyncStatus::Completed) { Loader::get()->queueInMainThread([callback] { callback({}); }); return; };
 
             auto props = async.GetResults();
-            auto thumbnail = props.Thumbnail();
+            auto thumbnail = props ? props.Thumbnail() : nullptr;
             if (!thumbnail) { Loader::get()->queueInMainThread([callback] { callback({}); }); return; };
 
             auto streamOp = thumbnail.OpenReadAsync();

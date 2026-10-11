@@ -38,8 +38,10 @@ $on_mod(Loaded) {
     }).leak();
     #endif
 
-    auto dummy = Label::create("", "font_default.fnt"_spr);
-    dummy->addAllFonts();
+    BitmapFont::load("font_default.fnt"_spr);
+    for (auto font : FALLBACK_FONTS) {
+        BitmapFont::load(font);
+    }
 
     if (Mod::get()->getSavedValue<bool>("hasAuthorized") && !PlaybackManager::get().isWindows()) {
         SpotifyAuth::get()->refresh([](std::string newToken) {
