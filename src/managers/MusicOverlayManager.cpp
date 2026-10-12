@@ -8,23 +8,15 @@
 #include <Geode/Utils.hpp>
 #include <arc/time/Sleep.hpp>
 
-#include <array>
-
 using namespace geode::prelude;
-
-static constexpr std::array FALLBACK_FONTS = {
-    "font_cyrillic.fnt"_spr,
-    "font_greek.fnt"_spr,
-    "font_japanese.fnt"_spr,
-    "font_thai.fnt"_spr,
-    "font_vietnamese.fnt"_spr,
-};
 
 static Label* createMusicLabel(std::string text) {
     auto label = Label::create(std::move(text), "font_default.fnt"_spr);
-    for (auto font : FALLBACK_FONTS) {
-        label->registerFont(font);
-    }
+    label->registerFont("font_cyrillic.fnt"_spr);
+    label->registerFont("font_greek.fnt"_spr);
+    label->registerFont("font_japanese.fnt"_spr);
+    label->registerFont("font_thai.fnt"_spr);
+    label->registerFont("font_vietnamese.fnt"_spr);
     return label;
 }
 
@@ -49,8 +41,6 @@ protected:
     ListenerHandle m_playbackListener;
 
     arc::TaskHandle<void> m_pollingTask;
-    int m_pollingCooldown = 0;
-    bool m_pollingToggle = false;
 
 
 	bool init() override {
@@ -310,32 +300,13 @@ protected:
             togglePlaybackBtn(status);
         });
         if(Mod::get()->getSavedValue<bool>("hasAuthorized") && !pbm.isWindows()) {
-            std::string token = Mod::get()->getSavedValue<std::string>("spotify-token", "");
-            if (token.empty()) {
-                log::error("No Spotify token available");
-                return;
-            }
+            pbm.pollSpotify(true);
 
-            PlaybackManager::get().spotifyGetPlaybackInfo(token, 0);
-
-            arc::Notify notify;
-
-            async::spawn([notify] -> arc::Future<> {
+            if (m_pollingTask.isValid()) m_pollingTask.abort();
+            m_pollingTask = async::spawn([] -> arc::Future<> {
                 while (true) {
-                    notify.notifyOne();
                     co_await arc::sleep(asp::Duration::fromSecs(1));
-                }
-            });
-
-            m_pollingTask = async::spawn([notify, token, this] -> arc::Future<> {
-                while (true) {
-                    co_await notify.notified();
-                    if (m_pollingCooldown > 0) m_pollingCooldown -= 1;
-                    
-                    if (m_pollingCooldown <= 0 && m_pollingToggle &&Mod::get()->getSavedValue<bool>("hasAuthorized")) {
-                        PlaybackManager::get().spotifyGetPlaybackInfo(token, 0);
-                        m_pollingCooldown = 4;
-                    }
+                    queueInMainThread([] { PlaybackManager::get().pollSpotify(); });
                 }
             });
         }
@@ -348,6 +319,7 @@ protected:
         m_playbackListener.destroy();
         m_imageListener.destroy();
         if (m_pollingTask.isValid()) m_pollingTask.abort();
+        pbm.m_spotifyPolling = false;
         CCLayer::onExit();
     }
 
@@ -391,16 +363,10 @@ public:
         }
         #endif
         if (Mod::get()->getSavedValue<bool>("hasAuthorized") && !pbm.isWindows()) {
-            m_pollingToggle = show;
-            if (m_pollingCooldown == 0) {
-                std::string token = Mod::get()->getSavedValue<std::string>("spotify-token", "");
-                if (token.empty()) {
-                    log::error("No Spotify token available");
-                    return;
-                }
-
-                PlaybackManager::get().spotifyGetPlaybackInfo(token, 0);
-                m_pollingCooldown = 4;
+            pbm.m_spotifyPolling = show;
+            if (show) {
+                pbm.resumeSpotify();
+                pbm.pollSpotify(true);
             }
         }
         if (Mod::get()->getSavedValue<bool>("autoEnabled")) {

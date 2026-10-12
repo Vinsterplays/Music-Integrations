@@ -25,7 +25,6 @@
 #define WINRT_CPPWINRT
 
 bool m_rebindWindowOpen = false;
-int m_rateLimitCounter = 0;
 async::TaskHolder<web::WebResponse> m_listener;
 
 $on_mod(Loaded) {
@@ -39,9 +38,11 @@ $on_mod(Loaded) {
     #endif
 
     BitmapFont::load("font_default.fnt"_spr);
-    for (auto font : FALLBACK_FONTS) {
-        BitmapFont::load(font);
-    }
+    BitmapFont::load("font_cyrillic.fnt"_spr);
+    BitmapFont::load("font_greek.fnt"_spr);
+    BitmapFont::load("font_japanese.fnt"_spr);
+    BitmapFont::load("font_thai.fnt"_spr);
+    BitmapFont::load("font_vietnamese.fnt"_spr);
 
     if (Mod::get()->getSavedValue<bool>("hasAuthorized") && !PlaybackManager::get().isWindows()) {
         SpotifyAuth::get()->refresh([](std::string newToken) {
@@ -64,9 +65,9 @@ $on_mod(Loaded) {
 
     GameEvent(geode::GameEventType::Loaded).listen([] {
         if (Mod::get()->getSavedValue<bool>("hasAuthorized") == false && PlaybackManager::get().isWindows() == false) {
-            createQuickPopup("Link Spotify", "Please link your Spotify account to use Music Integrations <cc>(You will have 2 minutes to authenticate)</c>", "Link Now", "Close",
+            createQuickPopup("Link Spotify", "Please link your Spotify account to use Music Integrations <cc>(You will have 2 minutes to authenticate)</c>", "Close", "Link Spotify",
                 [](auto, bool btn2) {
-                    if (btn2) return;
+                    if (!btn2) return;
                     SpotifyAuth::get()->start([](std::string code) {
                         auto req = web::WebRequest();
 
@@ -111,70 +112,40 @@ $on_mod(Loaded) {
             );
         }
 
-        arc::Notify notify;
-
         PlaybackManager::RateLimitUpdate("rate-limit-update"_spr).listen([] {
-            if(Mod::get()->getSavedValue<bool>("isRateLimited")) {
-                log::debug("rate limited!");
-                return;
-            }
-            m_rateLimitCounter += 1;
-            if (m_rateLimitCounter >= 10) {
-                log::debug("Rate limit hit! {}", m_rateLimitCounter);
-                Mod::get()->setSavedValue<bool>("isRateLimited", true);
-                CCSprite* warning = CCSprite::create("/foxy_1.png"_spr);
-                CCSize winSize = CCDirector::get()->getWinSize();
-                float scaleRatio = (winSize.height / warning->getContentSize().height);
-                warning->setScaleX(scaleRatio);
-                warning->setScaleY(scaleRatio);
-                CCScene::get()->addChildAtPosition(warning, Anchor::Center, {0, 0}, false);
-                CCArray* frames = CCArray::create();
-                for (int i = 1; i <= 14; i++) {
-                    auto filename = fmt::format("/foxy_{}.png"_spr, i);
-                    auto texture = CCTextureCache::sharedTextureCache()->addImage(filename.c_str(), false);
-                    if (texture) {
-                        auto frame = CCSpriteFrame::createWithTexture(texture, CCRectMake(0, 0, texture->getContentSize().width, texture->getContentSize().height));
-                        frames->addObject(frame);
-                    }
+            log::debug("Rate limit hit!");
+            CCSprite* warning = CCSprite::create("/foxy_1.png"_spr);
+            CCSize winSize = CCDirector::get()->getWinSize();
+            float scaleRatio = (winSize.height / warning->getContentSize().height);
+            warning->setScaleX(scaleRatio);
+            warning->setScaleY(scaleRatio);
+            CCScene::get()->addChildAtPosition(warning, Anchor::Center, {0, 0}, false);
+            CCArray* frames = CCArray::create();
+            for (int i = 1; i <= 14; i++) {
+                auto filename = fmt::format("/foxy_{}.png"_spr, i);
+                auto texture = CCTextureCache::sharedTextureCache()->addImage(filename.c_str(), false);
+                if (texture) {
+                    auto frame = CCSpriteFrame::createWithTexture(texture, CCRectMake(0, 0, texture->getContentSize().width, texture->getContentSize().height));
+                    frames->addObject(frame);
                 }
-
-                CCAnimation* anim = CCAnimation::createWithSpriteFrames(frames, 0.1f);
-                CCAnimate* animate = CCAnimate::create(anim);
-
-                warning->runAction(
-                    CCSequence::create(
-                        CallFuncExt::create([]() {
-                            FMODAudioEngine::sharedEngine()->playEffect("/fnafjumpscare.ogg"_spr);
-                        }),
-                        animate,
-                        CallFuncExt::create([warning]() {
-                            warning->removeFromParent();
-                        }),
-                        nullptr
-                    )
-                );
             }
+
+            CCAnimation* anim = CCAnimation::createWithSpriteFrames(frames, 0.1f);
+            CCAnimate* animate = CCAnimate::create(anim);
+
+            warning->runAction(
+                CCSequence::create(
+                    CallFuncExt::create([]() {
+                        FMODAudioEngine::sharedEngine()->playEffect("/fnafjumpscare.ogg"_spr);
+                    }),
+                    animate,
+                    CallFuncExt::create([warning]() {
+                        warning->removeFromParent();
+                    }),
+                    nullptr
+                )
+            );
         }).leak();
-
-        async::spawn([notify] -> arc::Future<> {
-            while (true) {
-                notify.notifyOne();
-                co_await arc::sleep(asp::Duration::fromMillis(1000));
-            }
-        });
-
-        async::spawn([notify] -> arc::Future<> {
-            while (true) {
-                co_await notify.notified();
-                if (m_rateLimitCounter > 0) {
-                    m_rateLimitCounter -= 1;
-                }
-                if (Mod::get()->getSavedValue<bool>("isRateLimited") && m_rateLimitCounter == 0) {
-                    log::debug("No longer rate limited!");
-                    Mod::get()->setSavedValue("isRateLimited", false);
-                }
-            }
-        });
 
     }).leak(); 
 }

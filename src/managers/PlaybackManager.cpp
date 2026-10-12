@@ -239,6 +239,7 @@ bool PlaybackManager::skip(bool direction) {
 
         std::string token = Mod::get()->getSavedValue<std::string>("spotify-token", "");
         if (token.empty()) { return false; }
+        if (!spotifyRegisterControl()) return false;
         PlaybackManager::get().spotifySkipRequest(token, 0, direction);
         return true;
      } else {
@@ -258,10 +259,11 @@ bool PlaybackManager::toggleControl() {
 
         std::string token = Mod::get()->getSavedValue<std::string>("spotify-token", "");
         if (token.empty()) { return false; }
+        if (!spotifyRegisterControl()) return false;
         spotifyisPlaybackActive(token, [](bool isPlaying) {
             std::string token = Mod::get()->getSavedValue<std::string>("spotify-token", "");
             if (token.empty()) return; 
-            PlaybackManager::get().spotifyControlRequest(token, 0, !isPlaying);
+            PlaybackManager::get().spotifyControlRequest(token, 0, !isPlaying, false);
         });
         return true;
     } else {
@@ -354,9 +356,108 @@ void PlaybackManager::getCurrentSongThumbnail(std::function<void(std::vector<uin
 }
 #endif
 
-void PlaybackManager::spotifyControlRequest(std::string token, int retryCount, bool play) {
-    if (retryCount > 1 || Mod::get()->getSavedValue<bool>("isRateLimited")) {
+bool PlaybackManager::spotifyCanRequest(bool isPoll) {
+    if (std::chrono::steady_clock::now() < m_retryAfter) return false;
+    if (isPoll && m_spotifyStopped) return false;
+    return true;
+}
+
+void PlaybackManager::spotifyOnSuccess() {
+    m_spotifyErrorCount = 0;
+}
+
+void PlaybackManager::spotifyOnError(std::string_view reason) {
+    if (m_spotifyStopped) return;
+    m_spotifyErrorCount += 1;
+    if (m_spotifyErrorCount < m_maxErrorLimit) {
+        log::warn("Spotify request failed ({}/{}): {}", m_spotifyErrorCount, m_maxErrorLimit, reason);
+        return;
+    }
+    m_spotifyStopped = true;
+    log::error("Too many Spotify errors in a row, polling stopped. Last error: {}", reason);
+}
+
+bool PlaybackManager::spotifyRegisterControl() {
+    auto now = std::chrono::steady_clock::now();
+    auto drained = std::chrono::duration_cast<std::chrono::seconds>(now - m_lastControlDecay);
+    if (drained.count() > 0) {
+        m_controlSpamCount = std::max<int>(0, m_controlSpamCount - static_cast<int>(drained.count()));
+        m_lastControlDecay += drained;
+    }
+
+    if (m_controlSpamBlocked) {
+        if (m_controlSpamCount > 0) {
+            log::debug("rate limited!");
+            return false;
+        }
+        log::debug("No longer rate limited!");
+        m_controlSpamBlocked = false;
+    }
+
+    m_controlSpamCount += 1;
+    if (m_controlSpamCount >= m_controlSpamLimit) {
+        log::debug("Rate limit hit! {}", m_controlSpamCount);
+        m_controlSpamBlocked = true;
+        RateLimitUpdate("rate-limit-update"_spr).send();
+    }
+    return true;
+}
+
+bool PlaybackManager::spotifyHandleRateLimit(web::WebResponse const& value) {
+    if (value.code() != 429) return false;
+
+    std::chrono::seconds wait = DEFAULT_RETRY_AFTER;
+    if (auto header = value.header("Retry-After")) {
+        wait = std::chrono::seconds(numFromString<int>(*header).unwrapOr(static_cast<int>(DEFAULT_RETRY_AFTER.count())));
+    }
+    m_retryAfter = std::chrono::steady_clock::now() + wait;
+    log::warn("Spotify rate limited, pausing requests for {}s", wait.count());
+    spotifyOnError("Rate limited (429)");
+    return true;
+}
+
+void PlaybackManager::pollSpotify(bool force) {
+    if (!force && !m_spotifyPolling) return;
+    if (isWindows() || !Mod::get()->getSavedValue<bool>("hasAuthorized")) return;
+    if (!spotifyCanRequest(true)) return;
+
+    auto now = std::chrono::steady_clock::now();
+    if (now - m_lastPoll < POLL_INTERVAL) return;
+
+    std::string token = Mod::get()->getSavedValue<std::string>("spotify-token", "");
+    if (token.empty()) {
+        log::error("No Spotify token available");
+        return;
+    }
+
+    m_lastPoll = now;
+    spotifyGetPlaybackInfo(token, 0);
+}
+
+void PlaybackManager::resumeSpotify() {
+    if (!m_spotifyStopped) return;
+    log::debug("Resuming Spotify polling");
+    m_spotifyStopped = false;
+    m_spotifyErrorCount = 0;
+}
+
+void PlaybackManager::spotifyControlRequest(std::string token, int retryCount, bool play, bool checkState) {
+    if (retryCount > 1 || !spotifyCanRequest(false)) {
         log::error("Max retries reached for control request");
+        return;
+    }
+
+    if (checkState) {
+        spotifyisPlaybackActive(token, [this, play](bool isPlaying) {
+            if (isPlaying == play) {
+                log::debug("Playback already {}, skipping request", play ? "playing" : "paused");
+                PlaybackUpdateEvent("playback-update"_spr).send(play);
+                return;
+            }
+            std::string token = Mod::get()->getSavedValue<std::string>("spotify-token", "");
+            if (token.empty()) return;
+            spotifyControlRequest(token, 0, play, false);
+        });
         return;
     }
     
@@ -364,9 +465,8 @@ void PlaybackManager::spotifyControlRequest(std::string token, int retryCount, b
     req.header("Authorization", fmt::format("Bearer {}", token));
     req.header("Content-Length", "0");
     req.bodyString("");
-    RateLimitUpdate("rate-limit-update"_spr).send();
 
-    m_listener.spawn(
+    m_controlListener.spawn(
         req.put(
             play ? "https://api.spotify.com/v1/me/player/play"
                 : "https://api.spotify.com/v1/me/player/pause",
@@ -375,11 +475,14 @@ void PlaybackManager::spotifyControlRequest(std::string token, int retryCount, b
         [this, retryCount, play, token](web::WebResponse value) {
             auto code = value.code();
 
+            if (spotifyHandleRateLimit(value)) return;
+
             if (code == 401) {
+                spotifyOnError("Unauthorized");
                 log::debug("Token expired, refreshing... (attempt {})", retryCount + 1);
                 SpotifyAuth::get()->refresh([this, retryCount, play](std::string newToken) {
                     log::debug("Token refreshed, retrying request");
-                    spotifyControlRequest(newToken, retryCount + 1, play);
+                    spotifyControlRequest(newToken, retryCount + 1, play, false);
                 });
                 return;
             }
@@ -388,33 +491,36 @@ void PlaybackManager::spotifyControlRequest(std::string token, int retryCount, b
             if (code == 404) { log::debug("No active device"); return; }
             
             if (value.ok()) {
+                spotifyOnSuccess();
                 PlaybackUpdateEvent("playback-update"_spr).send(play);
                 log::debug("Successfully {} playback", play ? "started" : "paused");
                 return;
             }
             
+            spotifyOnError(fmt::format("HTTP {}", code));
             log::error("Request failed with code: {} {}", code, value.string());
-            log::error("Token: {}", token);
         }
     );
 }
 
 void PlaybackManager::spotifyisPlaybackActive(std::string token, std::function<void(bool)> callback, int retryCount) {
-    if (retryCount > 1 || Mod::get()->getSavedValue<bool>("isRateLimited")) {
+    if (retryCount > 1 || !spotifyCanRequest(false)) {
         log::error("Max retries reached for playback info request");
         return callback(false);
     }
     
     auto req = web::WebRequest();
     req.header("Authorization", fmt::format("Bearer {}", token));
-    RateLimitUpdate("rate-limit-update"_spr).send();
     
-    m_listener.spawn(
+    m_controlListener.spawn(
         req.get("https://api.spotify.com/v1/me/player"),
         [this, retryCount, callback, token](web::WebResponse value) {
             auto code = value.code();
             
+            if (spotifyHandleRateLimit(value)) return;
+
             if (code == 401) {
+                spotifyOnError("Unauthorized");
                 log::debug("Token expired, refreshing... (attempt {})", retryCount + 1);
                 SpotifyAuth::get()->refresh([this, retryCount, callback](std::string newToken) {
                     log::debug("Token refreshed, retrying request");
@@ -427,6 +533,7 @@ void PlaybackManager::spotifyisPlaybackActive(std::string token, std::function<v
             if (code == 204) { log::debug("No active device"); return; }
             
             if (value.ok()) {
+                spotifyOnSuccess();
                 auto jsonResult = value.json();
                 if (!jsonResult.isOk()) {
                     log::error("Failed to parse JSON response");
@@ -445,15 +552,15 @@ void PlaybackManager::spotifyisPlaybackActive(std::string token, std::function<v
                 return;
             }
             
+            spotifyOnError(fmt::format("HTTP {}", code));
             log::error("Request failed with code: {} {}", code, value.string());
-            log::error("Token: {}", token);
             callback(false);
         }
     );
 }
 
 void PlaybackManager::spotifySkipRequest(std::string token, int retryCount, bool direction) {
-    if (retryCount > 1 || Mod::get()->getSavedValue<bool>("isRateLimited")) {
+    if (retryCount > 1 || !spotifyCanRequest(false)) {
         log::error("Max retries reached for control request");
         return;
     }
@@ -462,9 +569,8 @@ void PlaybackManager::spotifySkipRequest(std::string token, int retryCount, bool
     req.header("Authorization", fmt::format("Bearer {}", token));
     req.header("Content-Length", "0");
     req.bodyString("");
-    RateLimitUpdate("rate-limit-update"_spr).send();
     
-    m_listener.spawn(
+    m_controlListener.spawn(
         req.post(
             direction ? "https://api.spotify.com/v1/me/player/next"
                 : "https://api.spotify.com/v1/me/player/previous",
@@ -473,7 +579,10 @@ void PlaybackManager::spotifySkipRequest(std::string token, int retryCount, bool
         [this, retryCount, direction, token](web::WebResponse value) {
             auto code = value.code();
             
+            if (spotifyHandleRateLimit(value)) return;
+
             if (code == 401) {
+                spotifyOnError("Unauthorized");
                 log::debug("Token expired, refreshing... (attempt {})", retryCount + 1);
                 SpotifyAuth::get()->refresh([this, retryCount, direction](std::string newToken) {
                     log::debug("Token refreshed, retrying request");
@@ -486,32 +595,35 @@ void PlaybackManager::spotifySkipRequest(std::string token, int retryCount, bool
             if (code == 404) { log::debug("No active device"); return; }
             
             if (value.ok()) {
+                spotifyOnSuccess();
                 log::debug("Successfully skipped track: {}", direction ? "next" : "previous");
                 return;
             }
             
+            spotifyOnError(fmt::format("HTTP {}", code));
             log::error("Request failed with code: {} {}", code, value.string());
-            log::error("Token: {}", token);
         }
     );
 }
 
 void PlaybackManager::spotifyGetPlaybackInfo(std::string token, int retryCount) {
-    if (retryCount > 1 || Mod::get()->getSavedValue<bool>("isRateLimited")) {
+    if (retryCount > 1 || !spotifyCanRequest(true)) {
         log::error("Max retries reached for playback info request");
         return;
     }
     
     auto req = web::WebRequest();
     req.header("Authorization", fmt::format("Bearer {}", token));
-    RateLimitUpdate("rate-limit-update"_spr).send();
     
-    m_listener.spawn(
+    m_pollListener.spawn(
         req.get("https://api.spotify.com/v1/me/player/currently-playing", geode::getMod()),
         [this, retryCount, token](web::WebResponse value) {
             auto code = value.code();
             
+            if (spotifyHandleRateLimit(value)) return;
+
             if (code == 401) {
+                spotifyOnError("Unauthorized");
                 log::debug("Token expired, refreshing... (attempt {})", retryCount + 1);
                 SpotifyAuth::get()->refresh([this, retryCount](std::string newToken) {
                     log::debug("Token refreshed, retrying request");
@@ -524,17 +636,20 @@ void PlaybackManager::spotifyGetPlaybackInfo(std::string token, int retryCount) 
             if (code == 204) { log::debug("No active device"); return; }
             
             if (!value.ok()) {
+                spotifyOnError(fmt::format("HTTP {}", code));
                 log::error("Playback request failed: {} {}", code, value.string());
                 return;
             }
             
             auto jsonResult = value.json();
             if (!jsonResult.isOk()) {
+                spotifyOnError("Invalid playback JSON");
                 log::error("Failed to parse playback JSON");
                 log::error("Code: {}, Body: {}", code, value.string());
                 return;
             }
             
+            spotifyOnSuccess();
             auto root = jsonResult.unwrap();
             if (!root.contains("currently_playing_type") ||
                 root["currently_playing_type"].asString().unwrapOr("") != "track") {

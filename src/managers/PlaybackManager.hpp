@@ -7,6 +7,7 @@
 #include <winrt/Windows.Storage.Streams.h>
 #endif
 #include "Geode/loader/Event.hpp"
+#include <chrono>
 
 #define WINRT_CPPWINRT
 
@@ -20,8 +21,29 @@ using namespace Windows::Media::Control;
 class PlaybackManager {
 protected:
     PlaybackManager() = default;
-    async::TaskHolder<web::WebResponse> m_listener;
-    void spotifyControlRequest(std::string token, int retryCount = 0, bool play = true);
+    async::TaskHolder<web::WebResponse> m_pollListener;
+    async::TaskHolder<web::WebResponse> m_controlListener;
+
+    int m_maxErrorLimit = 10;
+    std::chrono::seconds POLL_INTERVAL = std::chrono::seconds(4);
+    std::chrono::seconds DEFAULT_RETRY_AFTER = std::chrono::seconds(30);
+    int m_spotifyErrorCount = 0;
+    bool m_spotifyStopped = false;
+    std::chrono::steady_clock::time_point m_lastPoll{};
+    std::chrono::steady_clock::time_point m_retryAfter{};
+
+    int m_controlSpamLimit = 8;
+    int m_controlSpamCount = 0;
+    bool m_controlSpamBlocked = false;
+    std::chrono::steady_clock::time_point m_lastControlDecay{};
+    bool spotifyRegisterControl();
+
+    bool spotifyCanRequest(bool isPoll);
+    void spotifyOnSuccess();
+    void spotifyOnError(std::string_view reason);
+    bool spotifyHandleRateLimit(web::WebResponse const& value);
+
+    void spotifyControlRequest(std::string token, int retryCount = 0, bool play = true, bool checkState = true);
     void spotifyisPlaybackActive(std::string token, std::function<void(bool)> callback,int retryCount = 0);
     void spotifySkipRequest(std::string token, int retryCount = 0, bool direction = true);
 public:
@@ -39,7 +61,10 @@ public:
     std::optional<std::string> getCurrentSongArtist();
     void getCurrentSongThumbnail(std::function<void(std::vector<uint8_t>)> callback);
     void spotifyGetPlaybackInfo(std::string token, int retryCount = 0);
+    void pollSpotify(bool force = false);
+    void resumeSpotify();
 
+    bool m_spotifyPolling = false;
     bool m_immune = false;
     bool m_active = false;
 

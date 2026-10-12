@@ -33,19 +33,39 @@ void SpotifyAuth::stop() {
     m_server.stop();
 }
 
+void SpotifyAuth::failRefresh(std::string const& refreshToken, bool badToken) {
+    m_refreshing = false;
+    m_refreshCallbacks.clear();
+    m_lastFailedRefresh = std::chrono::steady_clock::now();
+    if (badToken) m_badRefreshTokens.insert(refreshToken);
+}
+
 void SpotifyAuth::refresh(std::function<void(std::string)> callback) {
+    if (callback) m_refreshCallbacks.push_back(std::move(callback));
+    if (m_refreshing) return;
+
+    auto refreshToken = Mod::get()->getSavedValue<std::string>("spotify-refresh", "");
+    if (std::chrono::steady_clock::now() - m_lastFailedRefresh < REFRESH_COOLDOWN || m_badRefreshTokens.contains(refreshToken)) {
+        log::debug("Skipping token refresh, last attempt failed");
+        m_refreshCallbacks.clear();
+        return;
+    }
+
+    m_refreshing = true;
     auto req = web::WebRequest();
     m_listener.spawn(
-        req.post("https://craftify.thatgravyboat.tech/api/v1/public/auth?type=refresh&code=" + Mod::get()->getSavedValue<std::string>("spotify-refresh", ""), geode::getMod()),
-        [callback](web::WebResponse value) {
+        req.post("https://craftify.thatgravyboat.tech/api/v1/public/auth?type=refresh&code=" + refreshToken, geode::getMod()),
+        [this, refreshToken](web::WebResponse value) {
             auto jsonResult = value.json();
             if (!jsonResult.isOk()) {
                 log::error("Failed to parse JSON response");
+                failRefresh(refreshToken, false);
                 return;
             }
             
             auto jsonUnwrap = jsonResult.unwrap();
             if (!jsonUnwrap.contains("access_token")) {
+                failRefresh(refreshToken, value.code() != 429 && value.code() < 502);
                  if (value.code() == 500) {
                     log::debug("Authorization revoked");
                     Mod::get()->setSavedValue<bool>("hasAuthorized", false);
@@ -60,6 +80,7 @@ void SpotifyAuth::refresh(std::function<void(std::string)> callback) {
             if (!tokenResult.isOk()) {
                 log::error("Failed to get access_token as string");
                 log::error("Code: {}, Body: {}", value.code(), value.string());
+                failRefresh(refreshToken, false);
                 return;
             }
 
@@ -74,8 +95,11 @@ void SpotifyAuth::refresh(std::function<void(std::string)> callback) {
             std::string token = tokenResult.unwrap();
             Mod::get()->setSavedValue("spotify-token", token);
             
-            if (callback) {
-                callback(token);
+            m_refreshing = false;
+            auto callbacks = std::move(m_refreshCallbacks);
+            m_refreshCallbacks.clear();
+            for (auto& cb : callbacks) {
+                cb(token);
             }
         }
     );

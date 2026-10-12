@@ -1,3 +1,8 @@
+# 2.1.0
+- Rewrite spotify backend (Windows users unaffected)
+- Overlay now uses Geode's built in label class (more consistent labels)
+- Added more checks to reduce chance of crashes
+
 # 2.0.0
 - Support for other platforms! (via Spotify API integration)
 - Added an option to customize the keybind used to display the overlay
